@@ -1,21 +1,21 @@
 #!/usr/bin/python
 
 from mininet.net import Mininet
-from mininet.node import OVSKernelAP
+from mininet.node import Controller, OVSKernelAP
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.log import setLogLevel
 from subprocess import call, check_call, check_output
-import time
+import time, datetime
 
 
 def topology():
 
-    call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled=1"])
-    call(["sudo", "modprobe", "mptcp_coupled"])
-    call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control=lia"])
+    # call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled=1"])
+    # call(["sudo", "modprobe", "mptcp_coupled"])
+    # call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control=lia"])
 
-    net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink)
+    net = Mininet(controller=Controller, accessPoint=OVSKernelAP, link=TCLink)
 
     print "***Creating nodes..."
     h1 = net.addHost('h1', mac='00:00:00:00:00:01', ip='10.0.0.1/8')
@@ -27,7 +27,7 @@ def topology():
     ap2 = net.addAccessPoint('ap2', ssid='ap2-ssid', mode='g', channel='1', position='150,100,0', range='40')
     # ap3 = net.addAccessPoint('ap3', ssid='ap3-ssid', mode='g', channel='1',
     #                          position='130,50,0', range='40')
-    # c1 = net.addController('c1', controller=Controller)
+    c1 = net.addController('c1', controller=Controller)
 
     print "***Configuring propagation model..."
     net.propagationModel(model="logDistance", exp=4)
@@ -46,9 +46,9 @@ def topology():
     net.plotGraph(max_x=220, max_y=180)
 
     net.startMobility(time=0, AC='ssf')
-    net.mobility(sta1, 'start', time=20, position='100,50,0')
-    net.mobility(sta1, 'stop', time=30, position='145,100,0')
-    net.stopMobility(time=50)
+    net.mobility(sta1, 'start', time=30, position='100,50,0')
+    net.mobility(sta1, 'stop', time=40, position='145,100,0')
+    net.stopMobility(time=70)
 
     print "***Starting network"
     net.start()
@@ -80,29 +80,24 @@ def topology():
     print "***Setting flow tables..."
     call(["sudo", "bash", "ftConfig.sh"])
 
-    print "***Starting iperf..."
+    print "***Starting iperf and tcpdump..."
     h1.cmd("iperf -s &")
-    sta1.cmd("iperf -c 10.0.0.1 -t 30 &")
+    sta1.cmd("iperf -c 10.0.0.1 -t 130 &")
 
-    h1.cmd("tcpdump -i h1-eth0 -w h1-eth0.pcap &")
-    sta1.cmd("tcpdump -i any -w sta1.pcap &")
+    h1.cmd("tcpdump -i h1-eth0 -w h1-eth0-multi.pcap &")
+    sta1.cmd("tcpdump -i any -w sta1-multi.pcap &")
 
-    # print "***Running CLI"
-    # CLI(net)
+    # time.sleep(35)
+    # print "***Resetting the flow table again..."
+    # call(["sudo", "ovs-ofctl", "del-flows", "s1"])
+    # call(["sudo", "ovs-ofctl", "del-flows", "s2"])
+    # call(["sudo", "ovs-ofctl", "del-flows", "ap2"])
+    # call(["sudo", "bash", "ftConfig.sh"])
 
-    time.sleep(26)
-    print "***Deleting the link between sta1 and s2..."
-    net.delLinkBetween(sta1, s2)
-    #sta1.cmd("ip route del default scope global nexthop via 10.0.1.1 dev sta1-eth1")
-    #sta1.cmd("ip route add default scope global nexthop via 10.0.1.0 dev sta1-wlan0")
-    print sta1.params
-    call(["sudo", "ovs-ofctl", "dump-flows", "ap2"])
-    call(["sudo", "ovs-ofctl", "dump-flows", "s2"])
+    print "***Running CLI"
+    CLI(net)
 
-    print "***Finally..."
-    call(["sudo", "ovs-ofctl", "dump-flows", "ap2"])
-
-    time.sleep(25)
+    # time.sleep(70)
 
     print "***Stopping network"
     net.stop()

@@ -6,10 +6,10 @@ from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.log import setLogLevel
 
-from subprocess import call, check_call, check_output
+from subprocess import call
 import time
 
-def MobileNet(topology, mptcpEnabled, congestCtl):
+def MobileNet(mptcpEnabled, congestCtl):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled="+str(mptcpEnabled)])
     call(["sudo", "modprobe", "mptcp_coupled"])
@@ -146,6 +146,9 @@ def MobileNet(topology, mptcpEnabled, congestCtl):
             station.cmd('ip route add 10.0.'+str(i+1)+'.'+str(j)+'/32 dev '+sta_name+'-eth'+str(j)+' scope link table '+str(j+1))
             station.cmd('ip route add default via 10.0.'+str(i+1)+'.'+str(j)+' dev '+sta_name+'-eth'+str(j)+' table '+str(j+1))
 
+    # print "***Running CLI"
+    # CLI(net)
+
     time.sleep(70)
 
     print "*** Stopping network ***"
@@ -158,4 +161,4 @@ if __name__ == '__main__':
     mptcpEnabled = 1
     congestCtl = 'cubic'
     for i in range(0, repeatTimes):
-        MobileNet("topology/test.txt", mptcpEnabled, congestCtl)
+        MobileNet(mptcpEnabled, congestCtl)

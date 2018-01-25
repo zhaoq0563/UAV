@@ -11,9 +11,9 @@ import time
 
 def topology():
 
-    # call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled=1"])
-    # call(["sudo", "modprobe", "mptcp_coupled"])
-    # call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control=lia"])
+    call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled=0"])
+    call(["sudo", "modprobe", "mptcp_coupled"])
+    call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control=cubic"])
 
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink)
 
@@ -62,34 +62,33 @@ def topology():
 
     sta1.cmd('ifconfig sta1-wlan0 10.0.1.0/32')
 
-    # sta1.cmd('ip rule add from 10.0.1.0 table 1')
+    sta1.cmd('ip rule add from 10.0.1.0 table 1')
     # sta1.cmd('ip rule add from 10.0.1.1 table 2')
     #
-    # sta1.cmd('ip route add 10.0.1.0/32 dev sta1-wlan0 scope link table 1')
+    sta1.cmd('ip route add 10.0.1.0/32 dev sta1-wlan0 scope link table 1')
     # sta1.cmd('ip route add default via 10.0.1.0 dev sta1-wlan0 table 1')
     #
     # sta1.cmd('ip route add 10.0.1.1/32 dev sta1-eth1 scope link table 2')
     # sta1.cmd('ip route add default via 10.0.1.1 dev sta1-eth1 table 2')
     #
-    # sta1.cmd('ip route add default scope global nexthop via 10.0.1.1 dev sta1-eth1')
+    sta1.cmd('ip route add default scope global nexthop via 10.0.1.0 dev sta1-wlan0')
 
     print "***Setting flow tables..."
-    call(["sudo", "bash", "flowTable/ftConfig.sh"])
+    call(["sudo", "bash", "flowTable/ww-ftConfig.sh"])
 
     print "***Starting iperf..."
     h1.cmd("iperf -s &")
     sta1.cmd("iperf -c 10.0.0.1 -t 70 &")
 
-    h1.cmd("tcpdump -i h1-eth0 -w h1-eth0.pcap &")
-    sta1.cmd("tcpdump -i any -w sta1.pcap &")
+    h1.cmd("tcpdump -i h1-eth0 -w h1-eth0-ww-single.pcap &")
+    sta1.cmd("tcpdump -i any -w sta1-ww-single.pcap &")
 
     # print "***Running CLI"
     # CLI(net)
 
-    time.sleep(35)
+    time.sleep(36)
     print "***Deleting the link between sta1 and s2..."
-    net.delLinkBetween(sta1, ap1)
-    net.addLink(sta1, ap2)
+    sta1.moveAssociationTo(ap2, 'sta1-wlan0')
     #sta1.cmd("ip route del default scope global nexthop via 10.0.1.1 dev sta1-eth1")
     #sta1.cmd("ip route add default scope global nexthop via 10.0.1.0 dev sta1-wlan0")
     print sta1.params
@@ -98,7 +97,7 @@ def topology():
     print "***Finally..."
     call(["sudo", "ovs-ofctl", "dump-flows", "ap2"])
 
-    time.sleep(35)
+    time.sleep(70)
 
     print "***Stopping network"
     net.stop()

@@ -118,9 +118,9 @@ def MobileNet(mptcpEnabled, congestCtl):
 
     print "*** Configuring mobility ***"
     net.startMobility(time=0, AC='ssf')
-    net.mobility(nodes['sta1'], 'start', time=30, position='100,50,0')
-    net.mobility(nodes['sta2'], 'start', time=30, position='50,50,0')
-    net.mobility(nodes['sta3'], 'start', time=30, position='150,50,0')
+    net.mobility(nodes['sta1'], 'start', time=30, position='100,80,0')
+    net.mobility(nodes['sta2'], 'start', time=30, position='50,80,0')
+    net.mobility(nodes['sta3'], 'start', time=30, position='150,80,0')
     net.mobility(nodes['sta1'], 'stop', time=40, position='145,100,0')
     net.mobility(nodes['sta2'], 'stop', time=40, position='145,100,0')
     net.mobility(nodes['sta3'], 'stop', time=40, position='145,100,0')

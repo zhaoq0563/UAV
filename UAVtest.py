@@ -138,6 +138,8 @@ def mobileNet(mptcpEnabled, congestCtl):
         switch_name = 's'+str(i)
         node = net.addSwitch(switch_name)
         nodes[switch_name] = node
+        if i>numOfAp+numOfLte and i!=numOfSwitch:
+            nets.append(switch_name)
 
     '''Access Point'''
     for i in range(1, numOfAp+1):
@@ -188,8 +190,8 @@ def mobileNet(mptcpEnabled, congestCtl):
         node_lte = nodes['s'+str(numOfAp+numOfLte+1)]
         node_sta = nodes['sta'+str(i)]
         net.addLink(node_sta, node_lte, bw=float(lteBW), delay=str(lteDelay)+'ms', loss=float(lteLoss))
-        capacity['sta'+str(i)+'-s'+str(numOfAp+1)] = float(lteBW)
-        delay['sta'+str(i)+'-s'+str(numOfAp+1)] = float(lteDelay)
+        capacity['sta'+str(i)+'-s'+str(numOfAp+numOfLte+1)] = float(lteBW)
+        delay['sta'+str(i)+'-s'+str(numOfAp+numOfLte+1)] = float(lteDelay)
 
     '''Links between APs and switches'''
     for i in range(1, numOfAp+1):
@@ -202,6 +204,13 @@ def mobileNet(mptcpEnabled, congestCtl):
         node_u = nodes['s'+str(numOfAp+i)]
         node_d = nodes['s'+str(numOfAp+numOfLte+i)]
         net.addLink(node_d, node_u)
+
+    print users
+    print nets
+    print demand
+    print capacity
+    print delay
+
 
     print "*** Building the graph of the simulation ***"
     net.plotGraph(max_x=260, max_y=220)

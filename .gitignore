@@ -3,3 +3,5 @@
 *~
 .idea/
 results/
+*FTConfig*.sh
+*QConfig*.sh

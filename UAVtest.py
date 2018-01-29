@@ -114,10 +114,10 @@ def mobileNet(mptcpEnabled, congestCtl):
     mSta = 3
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = 10
-    backhaulDelay = 10
+    backhaulBW = 8
+    backhaulDelay = 8
     backhaulLoss = 1
-    lteBW = 1
+    lteBW = 5
     lteDelay = 10
     lteLoss = 1
     ethPerSta = 1
@@ -188,7 +188,7 @@ def mobileNet(mptcpEnabled, congestCtl):
         node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
         users.append(sta_name)
         nodes[sta_name] = node
-        demand[sta_name] = 6
+        demand[sta_name] = 3
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)

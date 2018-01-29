@@ -40,13 +40,15 @@ def deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta):
 def deployMobility(mode, *args):
     if mode=='equallyRandom':
         equRanMobility(*args)
+    elif mode=='randomCongest':
+        ranConMobility(*args)
 
 
 def equRanMobility(*args):
     (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta) = args
-    result = random.sample(range(1, numOfSta+1), mSta)
+    mStaSet = random.sample(range(1, numOfSta+1), mSta)
     for i in range(1, mSta+1):
-        sta_name = 'sta'+str(result[i-1])
+        sta_name = 'sta'+str(mStaSet[i-1])
         mobileSta.append(sta_name)                                                              # decide which sta to move
         speed = random.uniform(0.5, 1)                                                          # decide the speed for the sta
         while True:                                                                             # decide the destination ap
@@ -56,6 +58,25 @@ def equRanMobility(*args):
                 break
         paramOfSta[sta_name]['sTime'] = random.randint(1,20)                                    # decide the start time
         ap_name = 'ap'+str(paramOfSta[sta_name]['desAp'])
+        paramOfSta[sta_name]['ePos'] = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])     # decide the end position
+        sX = int(paramOfSta[sta_name]['sPos'].split(',')[0])
+        sY = int(paramOfSta[sta_name]['sPos'].split(',')[1])
+        eX = int(paramOfSta[sta_name]['ePos'].split(',')[0])
+        eY = int(paramOfSta[sta_name]['ePos'].split(',')[1])
+        distance = ((eX-sX)**2+(eY-sY)**2)**0.5
+        paramOfSta[sta_name]['eTime'] = paramOfSta[sta_name]['sTime']+int(distance/speed)       # decide the end time
+
+
+def ranConMobility(*args):
+    (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta) = args
+    mSta = numOfSta                                                                             # decide all sta move
+    desAp = random.randint(1, numOfAp)                                                          # decide the destination ap
+    ap_name = 'ap'+str(desAp)
+    speed = random.uniform(0.5, 1)                                                              # decide the speed for the sta
+    for i in range(1, mSta+1):
+        sta_name = 'sta'+str(i)
+        paramOfSta[sta_name]['desAp'] = desAp
+        paramOfSta[sta_name]['sTime'] = random.randint(1, 20)                                   # decide the start time
         paramOfSta[sta_name]['ePos'] = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])     # decide the end position
         sX = int(paramOfSta[sta_name]['sPos'].split(',')[0])
         sY = int(paramOfSta[sta_name]['sPos'].split(',')[1])
@@ -82,7 +103,11 @@ def mobileNet(mptcpEnabled, congestCtl):
     call(["sudo", "modprobe", "mptcp_coupled"])
     call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control="+congestCtl])
 
-    '''Parameters for simulation'''
+    '''Parameters for simulation
+    Parameter:  propModel:  (logDistance)
+                acMode:     (ssf, llf)
+                mobiMode:   (equallyRandom, randomCongest)
+    '''
     numOfAp = 3
     numOfLte = 1
     numOfSta = 5

@@ -68,10 +68,10 @@ def topology():
 
     print "***Starting iperf..."
     h1.cmd("iperf -s &")
-    sta1.cmd("iperf -c 10.0.0.1 -t 35 &")
+    sta1.cmd("iperf -c 10.0.0.1 -t 70 &")
 
-    h1.cmd("tcpdump -i h1-eth0 -w h1-eth0-single.pcap &")
-    sta1.cmd("tcpdump -i any -w sta1-single.pcap &")
+    h1.cmd("tcpdump -i h1-eth0 -w h1-eth0-ew-single.pcap &")
+    sta1.cmd("tcpdump -i any -w sta1-ew-single.pcap &")
 
     # print "***Running CLI"
     # CLI(net)
@@ -81,7 +81,7 @@ def topology():
     net.delLinkBetween(sta1, s2)
     sta1.cmd("ip route del default scope global nexthop via 10.0.1.1 dev sta1-eth1")
     sta1.cmd("ip route add default scope global nexthop via 10.0.1.0 dev sta1-wlan0")
-    sta1.cmd("iperf -c 10.0.0.1 -t 70 &")
+    # sta1.cmd("iperf -c 10.0.0.1 -t 70 &")
     print sta1.params
 
     time.sleep(35)

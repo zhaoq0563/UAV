@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from mininet.fdm import FDM
 from mininet.net import Mininet
 from mininet.node import OVSKernelAP
 from mininet.link import TCLink
@@ -7,9 +8,75 @@ from mininet.cli import CLI
 from mininet.log import setLogLevel
 
 from subprocess import call
-import time
+import time, random
 
-def MobileNet(mptcpEnabled, congestCtl):
+
+def getPos(center, range):
+    c = center.split(',')
+    r = int(range)
+    while True:
+        x = random.uniform(-r, r)
+        y = random.uniform(-r, r)
+        if (x**2)+(y**2)<(r**2) and (x**2)+(y**2)>(5**2):
+            c[0] = str(int(c[0]) + int(x))
+            c[1] = str(int(c[1]) + int(y))
+            break
+    return c[0]+','+c[1]+','+c[2]
+
+
+def deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta):
+    start = 1
+    for i in range(1, numOfSta+1):
+        if start>numOfAp:
+            start = 1
+        ap_name = 'ap' + str(start)
+        sta_name = 'sta' + str(i)
+        paramOfSta[sta_name] = {}
+        paramOfSta[sta_name]['sPos'] = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])
+        paramOfSta[sta_name]['ap'] = start
+        start += 1
+
+
+def deployMobility(mode, *args):
+    if mode=='equallyRandom':
+        equRanMobility(*args)
+
+
+def equRanMobility(*args):
+    (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta) = args
+    result = random.sample(range(1, numOfSta+1), mSta)
+    for i in range(1, mSta+1):
+        sta_name = 'sta'+str(result[i-1])
+        mobileSta.append(sta_name)                                                              # decide which sta to move
+        speed = random.uniform(0.5, 1)                                                          # decide the speed for the sta
+        while True:                                                                             # decide the destination ap
+            desAp = random.randint(1, numOfAp)
+            if desAp!=paramOfSta[sta_name]['ap']:
+                paramOfSta[sta_name]['desAp']=desAp
+                break
+        paramOfSta[sta_name]['sTime'] = random.randint(1,20)                                    # decide the start time
+        ap_name = 'ap'+str(paramOfSta[sta_name]['desAp'])
+        paramOfSta[sta_name]['ePos'] = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])     # decide the end position
+        sX = int(paramOfSta[sta_name]['sPos'].split(',')[0])
+        sY = int(paramOfSta[sta_name]['sPos'].split(',')[1])
+        eX = int(paramOfSta[sta_name]['ePos'].split(',')[0])
+        eY = int(paramOfSta[sta_name]['ePos'].split(',')[1])
+        distance = ((eX-sX)**2+(eY-sY)**2)**0.5
+        paramOfSta[sta_name]['eTime'] = paramOfSta[sta_name]['sTime']+int(distance/speed)       # decide the end time
+
+
+def setMobility(net, nodes, mobileSta, paramOfSta):
+    max = 0
+    for i in mobileSta:
+        print i + ':' + str(paramOfSta[i]['sTime']) + '  ' + paramOfSta[i]['sPos'] + '   ' + str(paramOfSta[i]['eTime']) + '  ' + paramOfSta[i]['ePos'] + ' ' + str(paramOfSta[i]['ap']) + '->' + str(paramOfSta[i]['desAp'])
+        net.mobility(nodes[i], 'start', time=paramOfSta[i]['sTime'], position=paramOfSta[i]['sPos'])
+        net.mobility(nodes[i], 'stop', time=paramOfSta[i]['eTime'], position=paramOfSta[i]['ePos'])
+        if paramOfSta[i]['eTime']>max:
+            max = paramOfSta[i]['eTime']
+    return max
+
+
+def mobileNet(mptcpEnabled, congestCtl):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled="+str(mptcpEnabled)])
     call(["sudo", "modprobe", "mptcp_coupled"])
@@ -18,7 +85,8 @@ def MobileNet(mptcpEnabled, congestCtl):
     '''Parameters for simulation'''
     numOfAp = 3
     numOfLte = 1
-    numOfSta = 3
+    numOfSta = 5
+    mSta = 3
     propModel = "logDistance"
     exponent = 4
     backhaulBW = 10
@@ -29,6 +97,9 @@ def MobileNet(mptcpEnabled, congestCtl):
     lteLoss = 1
     ethPerSta = 1
     wlanPerSta = 1
+    mStart = 0
+    acMode = 'ssf'
+    mobiMode = 'equallyRandom'
 
     '''Data needed for FDM'''
     users = []
@@ -36,6 +107,21 @@ def MobileNet(mptcpEnabled, congestCtl):
     demand = {}
     capacity = {}
     delay = {}
+
+    '''Date needed for mobility
+    Parameter:  paramOfAp { key: str(AP name), value: [str(AP center position), str(AP range)] }
+                mobileSta [ str(name of the moving station) ]
+                paramOfSta { key: str(Station name), value: { key: 'ap',    value: (int)index of currently connected ap }
+                                                            { key: 'desAp', value: (int)index of which ap the station goes }
+                                                            { key: 'sPos',  value: (str)starting position of the station }
+                                                            { key: 'ePos',  value: (str)ending position of the station }
+                                                            { key: 'sTime', value: (int)starting time of the station }
+                                                            { key: 'eTime', value: (int)ending time of the station }
+                           }
+    '''
+    paramOfAp = {}
+    mobileSta = []
+    paramOfSta = {}
 
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 
@@ -45,14 +131,6 @@ def MobileNet(mptcpEnabled, congestCtl):
     '''Host : One host serves as a server'''
     node = net.addHost('h1', ip='10.0.0.1')
     nodes['h1'] = node
-
-    '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
-    for i in range(1, numOfSta+1):
-        sta_name = 'sta'+str(i)
-        node = net.addStation(sta_name)
-        users.append(sta_name)
-        nodes[sta_name] = node
-        demand[sta_name] = 6
 
     '''Switch'''
     numOfSwitch = numOfAp+numOfLte*2+1                        # last one is for server h1
@@ -69,9 +147,21 @@ def MobileNet(mptcpEnabled, congestCtl):
         ap_chan = '1'
         ap_pos = str(40+60*(i-1))+',100,0'
         ap_range = '40'
+        paramOfAp[ap_name] = [ap_pos, ap_range]
         node = net.addAccessPoint(ap_name, ssid=ap_ssid, mode=ap_mode, channel=ap_chan, position=ap_pos, range=ap_range)
         nets.append(ap_name)
         nodes[ap_name] = node
+
+    '''Update the position of each station'''
+    deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta)
+
+    '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
+    for i in range(1, numOfSta + 1):
+        sta_name = 'sta' + str(i)
+        node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
+        users.append(sta_name)
+        nodes[sta_name] = node
+        demand[sta_name] = 6
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -117,14 +207,12 @@ def MobileNet(mptcpEnabled, congestCtl):
     net.plotGraph(max_x=260, max_y=220)
 
     print "*** Configuring mobility ***"
-    net.startMobility(time=0, AC='ssf')
-    net.mobility(nodes['sta1'], 'start', time=30, position='100,80,0')
-    net.mobility(nodes['sta2'], 'start', time=30, position='50,80,0')
-    net.mobility(nodes['sta3'], 'start', time=30, position='150,80,0')
-    net.mobility(nodes['sta1'], 'stop', time=40, position='145,100,0')
-    net.mobility(nodes['sta2'], 'stop', time=40, position='145,100,0')
-    net.mobility(nodes['sta3'], 'stop', time=40, position='145,100,0')
-    net.stopMobility(time=70)
+    net.startMobility(time=mStart, AC=acMode)
+
+    deployMobility(mobiMode, numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta)
+    mEnd = setMobility(net, nodes, mobileSta, paramOfSta)+20
+
+    net.stopMobility(time=mEnd)
 
     print "*** Starting network simulation ***"
     net.start()
@@ -149,7 +237,10 @@ def MobileNet(mptcpEnabled, congestCtl):
     # print "***Running CLI"
     # CLI(net)
 
-    time.sleep(70)
+    print "*** Starting FDM ***"
+    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2)
+
+    time.sleep(mEnd)
 
     print "*** Stopping network ***"
     net.stop()
@@ -161,4 +252,4 @@ if __name__ == '__main__':
     mptcpEnabled = 1
     congestCtl = 'cubic'
     for i in range(0, repeatTimes):
-        MobileNet(mptcpEnabled, congestCtl)
+        mobileNet(mptcpEnabled, congestCtl)

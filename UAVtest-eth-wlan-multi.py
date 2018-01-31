@@ -16,7 +16,7 @@ def ITGTest(client, server, bw, sTime):
     client.cmd('popd')
 
 
-def topology(name):
+def topology(name, enableFDM):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled=1"])
     call(["sudo", "modprobe", "mptcp_coupled"])
@@ -25,11 +25,11 @@ def topology(name):
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 
     '''Data needed for FDM'''
-    users = []
-    nets = []
-    demand = {}
-    capacity = {}
-    delay = {}
+    users = ['sta1', 'sta2', 'sta3']
+    nets = ['s4', 'ap1']
+    demand = {'sta1':1, 'sta2':1, 'sta3':1}
+    capacity = {'s2-s1':50, 's3-s1':1}
+    delay = {'s2-s1':250, 's3-s1':10}
 
     print "***Creating nodes..."
     nodes = {}
@@ -83,35 +83,35 @@ def topology(name):
     net.start()
 
     print "***Addressing for station..."
-    sta1.cmd('ifconfig sta1-wlan0 10.0.1.0/32')
-    sta1.cmd('ifconfig sta1-eth1 10.0.1.1/32')
-    sta1.cmd('ip rule add from 10.0.1.0 table 1')
-    sta1.cmd('ip rule add from 10.0.1.1 table 2')
-    sta1.cmd('ip route add 10.0.1.0/32 dev sta1-wlan0 scope link table 1')
-    sta1.cmd('ip route add default via 10.0.1.0 dev sta1-wlan0 table 1')
-    sta1.cmd('ip route add 10.0.1.1/32 dev sta1-eth1 scope link table 2')
-    sta1.cmd('ip route add default via 10.0.1.1 dev sta1-eth1 table 2')
-    sta1.cmd('ip route add default scope global nexthop via 10.0.1.1 dev sta1-eth1')
+    sta1.cmd('ifconfig sta1-wlan0 10.0.2.0/32')
+    sta1.cmd('ifconfig sta1-eth1 10.0.2.1/32')
+    sta1.cmd('ip rule add from 10.0.2.0 table 1')
+    sta1.cmd('ip rule add from 10.0.2.1 table 2')
+    sta1.cmd('ip route add 10.0.2.0/32 dev sta1-wlan0 scope link table 1')
+    sta1.cmd('ip route add default via 10.0.2.0 dev sta1-wlan0 table 1')
+    sta1.cmd('ip route add 10.0.2.1/32 dev sta1-eth1 scope link table 2')
+    sta1.cmd('ip route add default via 10.0.2.1 dev sta1-eth1 table 2')
+    sta1.cmd('ip route add default scope global nexthop via 10.0.2.1 dev sta1-eth1')
 
-    sta2.cmd('ifconfig sta2-wlan0 10.0.2.0/32')
-    sta2.cmd('ifconfig sta2-eth1 10.0.2.1/32')
-    sta2.cmd('ip rule add from 10.0.2.0 table 1')
-    sta2.cmd('ip rule add from 10.0.2.1 table 2')
-    sta2.cmd('ip route add 10.0.2.0/32 dev sta2-wlan0 scope link table 1')
-    sta2.cmd('ip route add 10.0.2.1/32 dev sta2-eth1 scope link table 2')
-    sta2.cmd('ip route add default via 10.0.2.0 dev sta2-wlan0 table 1')
-    sta2.cmd('ip route add default via 10.0.2.1 dev sta2-eth1 table 2')
-    sta2.cmd('ip route add default scope global nexthop via 10.0.2.1 dev sta2-eth1')
+    sta2.cmd('ifconfig sta2-wlan0 10.0.3.0/32')
+    sta2.cmd('ifconfig sta2-eth1 10.0.3.1/32')
+    sta2.cmd('ip rule add from 10.0.3.0 table 1')
+    sta2.cmd('ip rule add from 10.0.3.1 table 2')
+    sta2.cmd('ip route add 10.0.3.0/32 dev sta2-wlan0 scope link table 1')
+    sta2.cmd('ip route add 10.0.3.1/32 dev sta2-eth1 scope link table 2')
+    sta2.cmd('ip route add default via 10.0.3.0 dev sta2-wlan0 table 1')
+    sta2.cmd('ip route add default via 10.0.3.1 dev sta2-eth1 table 2')
+    sta2.cmd('ip route add default scope global nexthop via 10.0.3.1 dev sta2-eth1')
 
-    sta3.cmd('ifconfig sta3-wlan0 10.0.3.0/32')
-    sta3.cmd('ifconfig sta3-eth1 10.0.3.1/32')
-    sta3.cmd('ip rule add from 10.0.3.0 table 1')
-    sta3.cmd('ip rule add from 10.0.3.1 table 2')
-    sta3.cmd('ip route add 10.0.3.0/32 dev sta3-wlan0 scope link table 1')
-    sta3.cmd('ip route add default via 10.0.3.0 dev sta3-wlan0 table 1')
-    sta3.cmd('ip route add 10.0.3.1/32 dev sta3-eth1 scope link table 2')
-    sta3.cmd('ip route add default via 10.0.3.1 dev sta3-eth1 table 2')
-    sta3.cmd('ip route add default scope global nexthop via 10.0.3.1 dev sta3-eth1')
+    sta3.cmd('ifconfig sta3-wlan0 10.0.4.0/32')
+    sta3.cmd('ifconfig sta3-eth1 10.0.4.1/32')
+    sta3.cmd('ip rule add from 10.0.4.0 table 1')
+    sta3.cmd('ip rule add from 10.0.4.1 table 2')
+    sta3.cmd('ip route add 10.0.4.0/32 dev sta3-wlan0 scope link table 1')
+    sta3.cmd('ip route add default via 10.0.4.0 dev sta3-wlan0 table 1')
+    sta3.cmd('ip route add 10.0.4.1/32 dev sta3-eth1 scope link table 2')
+    sta3.cmd('ip route add default via 10.0.4.1 dev sta3-eth1 table 2')
+    sta3.cmd('ip route add default scope global nexthop via 10.0.4.1 dev sta3-eth1')
 
     print "***Setting flow tables..."
     call(["sudo", "bash", "flowTable/ew-ftConfig.sh"])
@@ -119,6 +119,9 @@ def topology(name):
     sta1.cmdPrint("ip link set dev sta1-wlan0 multipath off")
     sta3.cmdPrint("ip link set dev sta2-wlan0 multipath off")
     sta3.cmdPrint("ip link set dev sta3-wlan0 multipath off")
+
+    print "*** Starting FDM ***"
+    FDM(net, users, nets, demand, capacity, delay, 0, 150, 2, enableFDM)
 
     print "*** Starting D-ITG Server on host ***"
     host = nodes['h1']
@@ -161,12 +164,12 @@ def topology(name):
     print "*** Data processing ***"
     for i in range(1, 4):
         for j in range(0, 1):
-            ip = '10.0.'+str(i)+'.'+str(j)
+            ip = '10.0.'+str(i+1)+'.'+str(j)
             out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_mptcp.stat'
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
         for j in range(1, 2):
-            ip = '10.0.'+str(i)+'.'+str(j)
-            out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_mptcp.stat'
+            ip = '10.0.'+str(i+1)+'.'+str(j)
+            out_f = folderName+'/sta'+str(i)+'-eth'+str(j)+'_mptcp.stat'
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
 
     # print "***Running CLI"
@@ -181,4 +184,4 @@ if __name__ == '__main__':
     print "---Please name this testing:"
     name = raw_input()
     setLogLevel('info')
-    topology(name)
+    topology(name, True)

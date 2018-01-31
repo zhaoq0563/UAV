@@ -169,7 +169,7 @@ def topology(name):
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
         for j in range(1, 2):
             ip = '10.0.'+str(i)+'.'+str(j)
-            out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_sptcp.stat'
+            out_f = folderName+'/sta'+str(i)+'-eth'+str(j)+'_sptcp.stat'
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
 
     # print "***Running CLI"

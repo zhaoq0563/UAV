@@ -3,5 +3,6 @@
 *~
 .idea/
 results/
+pcap_*/
 *FTConfig*.sh
 *QConfig*.sh

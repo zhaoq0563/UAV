@@ -5,10 +5,10 @@ from mininet.net import Mininet
 from mininet.node import OVSKernelAP
 from mininet.link import TCLink
 from mininet.cli import CLI
-from mininet.log import setLogLevel
+from mininet.log import setLogLevel, info
 
 from subprocess import call
-import time, random
+import time, random, os
 
 
 def getPos(center, range):
@@ -97,7 +97,13 @@ def setMobility(net, nodes, mobileSta, paramOfSta):
     return max
 
 
-def mobileNet(mptcpEnabled, congestCtl):
+def ITGTest(client, server, bw, sTime):
+    info('Sending message from ', client.name, '<->', server.name, '\n')
+    client.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
+    client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 1000 -O '+str(bw)+' -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log &')
+    client.cmd('popd')
+
+def mobileNet(mptcpEnabled, congestCtl, name):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled="+str(mptcpEnabled)])
     call(["sudo", "modprobe", "mptcp_coupled"])
@@ -125,6 +131,8 @@ def mobileNet(mptcpEnabled, congestCtl):
     mStart = 0
     acMode = 'ssf'
     mobiMode = 'equallyRandom'
+    enableFDM = False
+    folderName = 'pcap_'+name
 
     '''Data needed for FDM'''
     users = []
@@ -272,18 +280,68 @@ def mobileNet(mptcpEnabled, congestCtl):
     # CLI(net)
 
     print "*** Starting FDM ***"
-    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2)
+    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2, enableFDM)
+
+    print "*** Starting D-ITG Server on host ***"
+    host = nodes['h1']
+    info('Starting D-ITG server...\n')
+    host.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
+    host.cmd('./ITGRecv &')
+    host.cmdPrint('PID=$!')
+    host.cmd('popd')
+    if not os.path.exists(folderName):
+        os.mkdir(folderName)
+        user = os.getenv('SUDO_USER')
+        os.system('sudo chown -R '+user+':'+user+' '+folderName)
+    host.cmd('tcpdump -i h1-eth0 -w '+folderName+'/h1.pcap &')
+
+    print "*** Starting D-ITG Clients on stations ***"
+    time.sleep(1)
+    for i in range(1, numOfSta+1):
+        sender = nodes['sta'+str(i)]
+        receiver = nodes['h'+str(1)]
+        bwReq = demand['sta'+str(i)]*125
+        ITGTest(sender, receiver, bwReq, (mEnd-1)*1000)
+        for j in range(0, wlanPerSta):
+            sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
+        for j in range(wlanPerSta, ethPerSta+wlanPerSta):
+            sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
+    print "*** Simulation is running. Please wait... ***"
 
     time.sleep(mEnd)
+
+    print "*** Stopping D-ITG Server on host ***"
+    info('Killing D-ITG server...\n')
+    host.cmdPrint('kill $PID')
+
+    print "*** Data processing ***"
+    for i in range(1, numOfSta+1):
+        for j in range(0, wlanPerSta):
+            ip = '10.0.'+str(i+1)+'.'+str(j)
+            if mptcpEnabled:
+                out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_mptcp.stat'
+            else:
+                out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_sptcp.stat'
+            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+        for j in range(wlanPerSta, ethPerSta+wlanPerSta):
+            ip = '10.0.'+str(i+1)+'.'+str(j)
+            if mptcpEnabled:
+                out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_mptcp.stat'
+            else:
+                out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_sptcp.stat'
+            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
 
     print "*** Stopping network ***"
     net.stop()
 
 
 if __name__ == '__main__':
+    print "*** Welcome to the Mininet simulation. ***"
+    print "---Please name this testing:"
+    name = raw_input()
     setLogLevel('info')
     repeatTimes = 1
-    mptcpEnabled = 1
+    mptcpEnabled = 0
     congestCtl = 'cubic'
     for i in range(0, repeatTimes):
-        mobileNet(mptcpEnabled, congestCtl)
+        mobileNet(mptcpEnabled, congestCtl, name)

@@ -337,7 +337,7 @@ def mobileNet(mptcpEnabled, congestCtl, name):
 
 if __name__ == '__main__':
     print "*** Welcome to the Mininet simulation. ***"
-    print "---Please name this testing:"
+    print "--- Please name this testing:"
     name = raw_input()
     setLogLevel('info')
     repeatTimes = 1

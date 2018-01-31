@@ -20,7 +20,7 @@ def topology(name):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled=0"])
     call(["sudo", "modprobe", "mptcp_coupled"])
-    call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control=lia"])
+    call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control=cubic"])
 
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 
@@ -31,9 +31,9 @@ def topology(name):
     s2 = net.addSwitch('s2')
     s3 = net.addSwitch('s3')
     s4 = net.addSwitch('s4')
-    sta1 = net.addStation('sta1')        # for congestion
-    sta2 = net.addStation('sta2')       # for congestion
-    sta3 = net.addStation('sta3')         # for congestion
+    sta1 = net.addStation('sta1')
+    sta2 = net.addStation('sta2')
+    sta3 = net.addStation('sta3')
     ap1 = net.addAccessPoint('ap1', ssid='ap1-ssid', mode='g', channel='1', position='150,100,0', range='50')
     nodes['h1'] = h1
     nodes['s1'] = s1
@@ -129,7 +129,7 @@ def topology(name):
         sender = nodes['sta'+str(i)]
         receiver = nodes['h'+str(1)]
         bwReq = 125
-        ITGTest(sender, receiver, bwReq, 149*1000)
+        ITGTest(sender, receiver, bwReq, 59*1000)
         for j in range(0, 1):
             sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
         for j in range(1, 2):
@@ -147,6 +147,11 @@ def topology(name):
     sta2.cmd("ip route add default scope global nexthop via 10.0.2.0 dev sta2-wlan0")
     sta3.cmd("ip route del default scope global nexthop via 10.0.3.1 dev sta3-eth1")
     sta3.cmd("ip route add default scope global nexthop via 10.0.3.0 dev sta3-wlan0")
+    for i in range(1, 4):
+        sender = nodes['sta'+str(i)]
+        receiver = nodes['h'+str(1)]
+        bwReq = 125
+        ITGTest(sender, receiver, bwReq, 89*1000)
 
     time.sleep(89)
 
@@ -174,7 +179,7 @@ def topology(name):
 
 if __name__ == '__main__':
     print "*** Welcome to the Mininet simulation. ***"
-    print "---Please name this testing:"
+    print "--- Please name this testing:"
     name = raw_input()
     setLogLevel('info')
     topology(name)

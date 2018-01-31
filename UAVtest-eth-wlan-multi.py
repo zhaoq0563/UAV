@@ -65,7 +65,7 @@ def topology(name):
     net.addLink(s4, s2)
     net.addLink(ap1, s3)
     net.addLink(s2, s1, bw=50, delay='250ms', loss=1)
-    net.addLink(s3, s1, bw=10, delay='10ms', loss=1)
+    net.addLink(s3, s1, bw=1, delay='10ms', loss=1)
     net.addLink(s1, h1)
 
     net.plotGraph(max_x=220, max_y=180)
@@ -139,7 +139,7 @@ def topology(name):
     for i in range(1, 4):
         sender = nodes['sta'+str(i)]
         receiver = nodes['h'+str(1)]
-        bwReq = 6*125
+        bwReq = 125
         ITGTest(sender, receiver, bwReq, 149*1000)
         for j in range(0, 1):
             sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
@@ -157,6 +157,23 @@ def topology(name):
     print "*** Stopping D-ITG Server on host ***"
     info('Killing D-ITG server...\n')
     host.cmdPrint('kill $PID')
+
+    print "*** Data processing ***"
+    for i in range(1, 4):
+        for j in range(0, 1):
+            ip = '10.0.'+str(i)+'.'+str(j)
+            if mptcpEnabled:
+                out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_mptcp.stat'
+            else:
+                out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_sptcp.stat'
+            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+        for j in range(1, 2):
+            ip = '10.0.'+str(i)+'.'+str(j)
+            if mptcpEnabled:
+                out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_mptcp.stat'
+            else:
+                out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_sptcp.stat'
+            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
 
     # print "***Running CLI"
     # CLI(net)

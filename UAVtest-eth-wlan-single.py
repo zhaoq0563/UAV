@@ -136,7 +136,7 @@ def topology(name):
             sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
     print "*** Simulation is running. Please wait... ***"
 
-    time.sleep(60)
+    time.sleep(65)
     print "*** Deleting the link between stations and STACOM ***"
     net.delLinkBetween(sta1, s4)
     net.delLinkBetween(sta2, s4)
@@ -151,9 +151,9 @@ def topology(name):
         sender = nodes['sta'+str(i)]
         receiver = nodes['h'+str(1)]
         bwReq = 125
-        ITGTest(sender, receiver, bwReq, 89*1000)
+        ITGTest(sender, receiver, bwReq, 84*1000)
 
-    time.sleep(89)
+    time.sleep(84)
 
     print "*** Stopping D-ITG Server on host ***"
     info('Killing D-ITG server...\n')

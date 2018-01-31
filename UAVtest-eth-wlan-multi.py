@@ -38,9 +38,9 @@ def topology(name):
     s2 = net.addSwitch('s2')
     s3 = net.addSwitch('s3')
     s4 = net.addSwitch('s4')
-    sta1 = net.addStation('sta1', position='50,80,0')        # for congestion
-    sta2 = net.addStation('sta2', position='50,50,0')       # for congestion
-    sta3 = net.addStation('sta3', position='80,50,0')         # for congestion
+    sta1 = net.addStation('sta1')        # for congestion
+    sta2 = net.addStation('sta2')       # for congestion
+    sta3 = net.addStation('sta3')         # for congestion
     ap1 = net.addAccessPoint('ap1', ssid='ap1-ssid', mode='g', channel='1', position='150,100,0', range='50')
     nodes['h1'] = h1
     nodes['s1'] = s1
@@ -71,9 +71,9 @@ def topology(name):
     net.plotGraph(max_x=220, max_y=180)
 
     net.startMobility(time=0, AC='ssf')
-    net.mobility(sta1, 'start', time=10)
-    net.mobility(sta2, 'start', time=10)
-    net.mobility(sta3, 'start', time=10)
+    net.mobility(sta1, 'start', time=10, position='50,80,0')
+    net.mobility(sta2, 'start', time=10, position='50,50,0')
+    net.mobility(sta3, 'start', time=10, position='80,50,0')
     net.mobility(sta1, 'stop', time=110, position='150,130,0')
     net.mobility(sta2, 'stop', time=110, position='155,105,0')
     net.mobility(sta3, 'stop', time=110, position='180,100,0')

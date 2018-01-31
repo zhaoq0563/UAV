@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from mininet.fdm import FDM
 from mininet.net import Mininet
 from mininet.node import OVSKernelAP
 from mininet.link import TCLink
@@ -184,4 +185,4 @@ if __name__ == '__main__':
     print "---Please name this testing:"
     name = raw_input()
     setLogLevel('info')
-    topology(name, True)
+    topology(name, False)

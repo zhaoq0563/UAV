@@ -24,13 +24,6 @@ def topology(name):
 
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 
-    '''Data needed for FDM'''
-    users = []
-    nets = []
-    demand = {}
-    capacity = {}
-    delay = {}
-
     print "***Creating nodes..."
     nodes = {}
     h1 = net.addHost('h1', ip='10.0.0.1')

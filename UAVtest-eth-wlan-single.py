@@ -150,10 +150,10 @@ def topology(name):
     net.delLinkBetween(sta3, s4)
     sta1.cmd("ip route del default scope global nexthop via 10.0.1.1 dev sta1-eth1")
     sta1.cmd("ip route add default scope global nexthop via 10.0.1.0 dev sta1-wlan0")
-    sta2.cmd("ip route del default scope global nexthop via 10.0.2.1 dev sta1-eth1")
-    sta2.cmd("ip route add default scope global nexthop via 10.0.2.0 dev sta1-wlan0")
-    sta3.cmd("ip route del default scope global nexthop via 10.0.3.1 dev sta1-eth1")
-    sta3.cmd("ip route add default scope global nexthop via 10.0.3.0 dev sta1-wlan0")
+    sta2.cmd("ip route del default scope global nexthop via 10.0.2.1 dev sta2-eth1")
+    sta2.cmd("ip route add default scope global nexthop via 10.0.2.0 dev sta2-wlan0")
+    sta3.cmd("ip route del default scope global nexthop via 10.0.3.1 dev sta3-eth1")
+    sta3.cmd("ip route add default scope global nexthop via 10.0.3.0 dev sta3-wlan0")
 
     time.sleep(89)
 

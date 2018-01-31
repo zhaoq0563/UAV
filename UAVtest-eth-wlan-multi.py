@@ -4,9 +4,9 @@ from mininet.net import Mininet
 from mininet.node import OVSKernelAP
 from mininet.link import TCLink
 from mininet.cli import CLI
-from mininet.log import setLogLevel
-from subprocess import call, check_call, check_output
-import time
+from mininet.log import setLogLevel, info
+from subprocess import call
+import time, os
 
 
 def ITGTest(client, server, bw, sTime):

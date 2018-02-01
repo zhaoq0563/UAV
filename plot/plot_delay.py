@@ -1,5 +1,5 @@
-
 #!/usr/bin/python
+
 import os
 from numpy import array
 import numpy as np

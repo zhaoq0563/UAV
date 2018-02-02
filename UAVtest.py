@@ -24,7 +24,7 @@ def getPos(center, range):
     return c[0]+','+c[1]+','+c[2]
 
 
-def deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta):
+def deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, replay, config):
     start = 1
     for i in range(1, numOfSta+1):
         if start>numOfAp:
@@ -32,9 +32,28 @@ def deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta):
         ap_name = 'ap' + str(start)
         sta_name = 'sta' + str(i)
         paramOfSta[sta_name] = {}
-        paramOfSta[sta_name]['sPos'] = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])
+        if replay==1:
+            sPos = config.readline().strip('\n')
+        else:
+            sPos = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])
+            config.write(sPos+'\n')
+        paramOfSta[sta_name]['sPos'] = sPos
         paramOfSta[sta_name]['ap'] = start
         start += 1
+
+
+def loadMobilityParams(paramOfSta, mobileSta, config):
+    line = config.readline()
+    while line!='':
+        sta_name = line.strip('\n')
+        mobileSta.append(sta_name)
+        sTime = int(config.readline().strip('\n'))
+        paramOfSta[sta_name]['sTime'] = sTime
+        ePos = config.readline().strip('\n')
+        paramOfSta[sta_name]['ePos'] = ePos
+        eTime = int(config.readline().strip('\n'))
+        paramOfSta[sta_name]['eTime'] = eTime
+        line = config.readline()
 
 
 def deployMobility(mode, *args):
@@ -45,7 +64,7 @@ def deployMobility(mode, *args):
 
 
 def equRanMobility(*args):
-    (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta) = args
+    (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta, config) = args
     mStaSet = random.sample(range(1, numOfSta+1), mSta)
     for i in range(1, mSta+1):
         sta_name = 'sta'+str(mStaSet[i-1])
@@ -65,10 +84,14 @@ def equRanMobility(*args):
         eY = int(paramOfSta[sta_name]['ePos'].split(',')[1])
         distance = ((eX-sX)**2+(eY-sY)**2)**0.5
         paramOfSta[sta_name]['eTime'] = paramOfSta[sta_name]['sTime']+int(distance/speed)       # decide the end time
+        config.write(sta_name+'\n')
+        config.write(str(paramOfSta[sta_name]['sTime'])+'\n')
+        config.write(paramOfSta[sta_name]['ePos']+'\n')
+        config.write(str(paramOfSta[sta_name]['eTime'])+'\n')
 
 
 def ranConMobility(*args):
-    (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta) = args
+    (numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta, config) = args
     mSta = numOfSta                                                                             # decide all sta move
     desAp = random.randint(1, numOfAp)                                                          # decide the destination ap
     ap_name = 'ap'+str(desAp)
@@ -84,6 +107,10 @@ def ranConMobility(*args):
         eY = int(paramOfSta[sta_name]['ePos'].split(',')[1])
         distance = ((eX-sX)**2+(eY-sY)**2)**0.5
         paramOfSta[sta_name]['eTime'] = paramOfSta[sta_name]['sTime']+int(distance/speed)       # decide the end time
+        config.write(sta_name+'\n')
+        config.write(str(paramOfSta[sta_name]['sTime'])+'\n')
+        config.write(paramOfSta[sta_name]['ePos']+'\n')
+        config.write(str(paramOfSta[sta_name]['eTime'])+'\n')
 
 
 def setMobility(net, nodes, mobileSta, paramOfSta):
@@ -190,17 +217,20 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
 
         if replay==1:
             ap_pos = rConfig.readline().strip('\n')
-            paramOfAp[ap_name] = [ap_pos, ap_range]
         else:
             ap_pos = str(40+60*(i-1))+',100,0'
             wConfig.write(ap_pos+'\n')
 
+        paramOfAp[ap_name] = [ap_pos, ap_range]
         node = net.addAccessPoint(ap_name, ssid=ap_ssid, mode=ap_mode, channel=ap_chan, position=ap_pos, range=ap_range)
         nets.append(ap_name)
         nodes[ap_name] = node
 
     '''Update the position of each station'''
-    deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, )
+    if replay==1:
+        deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, replay, rConfig)
+    else:
+        deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, replay, wConfig)
 
     '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
     for i in range(1, numOfSta + 1):
@@ -263,7 +293,11 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
     print "*** Configuring mobility ***"
     net.startMobility(time=mStart, AC=acMode)
 
-    deployMobility(mobiMode, numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta)
+    if replay==1:
+        # read from config and put data into paramOfSta
+        loadMobilityParams(paramOfSta, mobileSta, rConfig)
+    else:
+        deployMobility(mobiMode, numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta, wConfig)
     mEnd = setMobility(net, nodes, mobileSta, paramOfSta)+20
 
     net.stopMobility(time=mEnd)

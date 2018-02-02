@@ -103,7 +103,7 @@ def ITGTest(client, server, bw, sTime):
     client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 1000 -O '+str(bw)+' -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log &')
     client.cmd('popd')
 
-def mobileNet(mptcpEnabled, congestCtl, name):
+def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled="+str(mptcpEnabled)])
     call(["sudo", "modprobe", "mptcp_coupled"])
@@ -156,6 +156,12 @@ def mobileNet(mptcpEnabled, congestCtl, name):
     mobileSta = []
     paramOfSta = {}
 
+    if replay==1:
+        #load from configFile
+        rConfig = open('configFile', 'r')
+    else:
+        wConfig = open('configFile', 'w')
+
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 
     print "*** Creating nodes ***"
@@ -180,15 +186,21 @@ def mobileNet(mptcpEnabled, congestCtl, name):
         ap_ssid = ap_name+'_ssid'
         ap_mode = 'g'
         ap_chan = '1'
-        ap_pos = str(40+60*(i-1))+',100,0'
         ap_range = '40'
-        paramOfAp[ap_name] = [ap_pos, ap_range]
+
+        if replay==1:
+            ap_pos = rConfig.readline().strip('\n')
+            paramOfAp[ap_name] = [ap_pos, ap_range]
+        else:
+            ap_pos = str(40+60*(i-1))+',100,0'
+            wConfig.write(ap_pos+'\n')
+
         node = net.addAccessPoint(ap_name, ssid=ap_ssid, mode=ap_mode, channel=ap_chan, position=ap_pos, range=ap_range)
         nets.append(ap_name)
         nodes[ap_name] = node
 
     '''Update the position of each station'''
-    deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta)
+    deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, )
 
     '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
     for i in range(1, numOfSta + 1):
@@ -337,11 +349,46 @@ def mobileNet(mptcpEnabled, congestCtl, name):
 
 if __name__ == '__main__':
     print "*** Welcome to the Mininet simulation. ***"
-    print "--- Please name this testing:"
-    name = raw_input()
+    while True:
+        name = raw_input('--- Please name this testing')
+        break
+    while True:
+        mptcpEnabled = raw_input('--- Testing MPTCP? (Default YES)')
+        if mptcpEnabled=='no' or mptcpEnabled=='n' or mptcpEnabled=='0':
+            mptcpEnabled = 0
+            break
+        elif mptcpEnabled=='y' or mptcpEnabled=='yes' or mptcpEnabled=='1' or mptcpEnabled=='':
+            mptcpEnabled = 1
+            break
+    while True:
+        congestCtl = raw_input('--- Congestion mode? (Default cubic)')
+        if congestCtl=='lia':
+            break
+        elif congestCtl=='':
+            congestCtl = 'cubic'
+            break
+    while True:
+        replay = raw_input('--- Is it replaying testing? (Default NO)')
+        if replay=='no' or replay=='n' or replay=='0' or replay=='':
+            replay = 0
+            while True:
+                configName = raw_input('--- Please name the configuration file:')
+                if not os.path.exists(configName+'.config'):
+                    break
+                override = raw_input('File exists. Override? (Default YES)')
+                if override=='y' or override=='yes' or override=='1' or override=='':
+                    break
+            break
+        elif replay=='yes' or replay=='y' or replay=='1':
+            replay = 1
+            while True:
+                configName = raw_input('--- Please input the configuration file:')
+                if os.path.exists(configName+'.config'):
+                    break
+                print "!!!Error!!! Configuration file is not existed!"
+            break
+
     setLogLevel('info')
     repeatTimes = 1
-    mptcpEnabled = 0
-    congestCtl = 'cubic'
     for i in range(0, repeatTimes):
-        mobileNet(mptcpEnabled, congestCtl, name)
+        mobileNet(name, mptcpEnabled, congestCtl, replay, configName+'.config')

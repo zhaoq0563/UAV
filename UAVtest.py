@@ -116,7 +116,7 @@ def ranConMobility(*args):
 def setMobility(net, nodes, mobileSta, paramOfSta):
     max = 0
     for i in mobileSta:
-        print i + ':' + str(paramOfSta[i]['sTime']) + '  ' + paramOfSta[i]['sPos'] + '   ' + str(paramOfSta[i]['eTime']) + '  ' + paramOfSta[i]['ePos'] + ' ' + str(paramOfSta[i]['ap']) + '->' + str(paramOfSta[i]['desAp'])
+        print i + ':' + str(paramOfSta[i]['sTime']) + '  ' + paramOfSta[i]['sPos'] + '   ' + str(paramOfSta[i]['eTime']) + '  ' + paramOfSta[i]['ePos']
         net.mobility(nodes[i], 'start', time=paramOfSta[i]['sTime'], position=paramOfSta[i]['sPos'])
         net.mobility(nodes[i], 'stop', time=paramOfSta[i]['eTime'], position=paramOfSta[i]['ePos'])
         if paramOfSta[i]['eTime']>max:
@@ -130,7 +130,7 @@ def ITGTest(client, server, bw, sTime):
     client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 1000 -O '+str(bw)+' -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log &')
     client.cmd('popd')
 
-def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
+def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled="+str(mptcpEnabled)])
     call(["sudo", "modprobe", "mptcp_coupled"])
@@ -147,8 +147,8 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
     mSta = 3
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = 8
-    backhaulDelay = 8
+    backhaulBW = [8, 3, 8, 15]
+    backhaulDelay = [1, 1, 1, 10]
     backhaulLoss = 1
     lteBW = 5
     lteDelay = 10
@@ -158,7 +158,6 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
     mStart = 0
     acMode = 'ssf'
     mobiMode = 'equallyRandom'
-    enableFDM = False
     folderName = 'pcap_'+name
 
     '''Data needed for FDM'''
@@ -184,10 +183,9 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
     paramOfSta = {}
 
     if replay==1:
-        #load from configFile
-        rConfig = open('configFile', 'r')
+        rConfig = open(configFile, 'r')
     else:
-        wConfig = open('configFile', 'w')
+        wConfig = open(configFile, 'w')
 
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 
@@ -240,6 +238,11 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
         nodes[sta_name] = node
         demand[sta_name] = 3
 
+    sta6 = net.addStation('sta6', position='110,110,0')
+    users.append('sta6')
+    nodes['sta6'] = sta6
+    demand['sta6'] = 1
+
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
 
@@ -251,9 +254,9 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
     for i in range(1, numOfAp+numOfLte+1):
         node_u = nodes['s'+str(numOfSwitch)]
         node_d = nodes['s'+str(i)]
-        net.addLink(node_d, node_u, bw=float(backhaulBW), delay=str(backhaulDelay)+'ms', loss=float(backhaulLoss))
-        capacity['s'+str(i)+'-s'+str(numOfSwitch)] = float(backhaulBW)
-        delay['s'+str(i)+'-s'+str(numOfSwitch)] = float(backhaulDelay)
+        net.addLink(node_d, node_u, bw=float(backhaulBW[i-1]), delay=str(backhaulDelay[i-1])+'ms', loss=float(backhaulLoss))
+        capacity['s'+str(i)+'-s'+str(numOfSwitch)] = float(backhaulBW[i-1])
+        delay['s'+str(i)+'-s'+str(numOfSwitch)] = float(backhaulDelay[i-1])
 
     '''Link between server and switch'''
     node_h = nodes['h1']
@@ -294,10 +297,11 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
     net.startMobility(time=mStart, AC=acMode)
 
     if replay==1:
-        # read from config and put data into paramOfSta
         loadMobilityParams(paramOfSta, mobileSta, rConfig)
+        rConfig.close()
     else:
         deployMobility(mobiMode, numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta, wConfig)
+        wConfig.close()
     mEnd = setMobility(net, nodes, mobileSta, paramOfSta)+20
 
     net.stopMobility(time=mEnd)
@@ -322,11 +326,14 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
             station.cmd('ip route add 10.0.'+str(i+1)+'.'+str(j)+'/32 dev '+sta_name+'-eth'+str(j)+' scope link table '+str(j+1))
             station.cmd('ip route add default via 10.0.'+str(i+1)+'.'+str(j)+' dev '+sta_name+'-eth'+str(j)+' table '+str(j+1))
 
-    # print "***Running CLI"
-    # CLI(net)
+    sta6.cmd('ifconfig sta6-wlan0 10.0.7.0/32')
+    sta6.cmd('ip route add default via 10.0.7.0 dev sta6-wlan0')
 
     print "*** Starting FDM ***"
-    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2, enableFDM)
+    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2, bool(fdmEnabled))
+
+    # print "***Running CLI"
+    #CLI(net)
 
     print "*** Starting D-ITG Server on host ***"
     host = nodes['h1']
@@ -352,6 +359,10 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
             sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
         for j in range(wlanPerSta, ethPerSta+wlanPerSta):
             sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
+
+    ITGTest(sta6, nodes['h1'], 125, (mEnd-1)*1000)
+    sta6.cmd('tcpdump -i sta6-wlan0 -w '+folderName+'/sta6-wlan0.pcap &')
+
     print "*** Simulation is running. Please wait... ***"
 
     time.sleep(mEnd)
@@ -384,10 +395,10 @@ def mobileNet(name, mptcpEnabled, congestCtl, replay, configFile):
 if __name__ == '__main__':
     print "*** Welcome to the Mininet simulation. ***"
     while True:
-        name = raw_input('--- Please name this testing')
+        name = raw_input('--- Please name this testing: ')
         break
     while True:
-        mptcpEnabled = raw_input('--- Testing MPTCP? (Default YES)')
+        mptcpEnabled = raw_input('--- Enable MPTCP? (Default YES): ')
         if mptcpEnabled=='no' or mptcpEnabled=='n' or mptcpEnabled=='0':
             mptcpEnabled = 0
             break
@@ -395,34 +406,42 @@ if __name__ == '__main__':
             mptcpEnabled = 1
             break
     while True:
-        congestCtl = raw_input('--- Congestion mode? (Default cubic)')
+        fdmEnabled = raw_input('--- Enable FDM? (Default YES): ')
+        if fdmEnabled=='no' or fdmEnabled=='n' or fdmEnabled=='0':
+            fdmEnabled = 0
+            break
+        elif fdmEnabled=='y' or fdmEnabled=='yes' or fdmEnabled=='1' or fdmEnabled=='':
+            fdmEnabled = 1
+            break
+    while True:
+        congestCtl = raw_input('--- Congestion mode? (Default cubic): ')
         if congestCtl=='lia':
             break
         elif congestCtl=='':
             congestCtl = 'cubic'
             break
     while True:
-        replay = raw_input('--- Is it replaying testing? (Default NO)')
+        replay = raw_input('--- Is it replaying testing? (Default NO): ')
         if replay=='no' or replay=='n' or replay=='0' or replay=='':
             replay = 0
             while True:
-                configName = raw_input('--- Please name the configuration file:')
+                configName = raw_input('--- Please name the configuration file: ')
                 if not os.path.exists(configName+'.config'):
                     break
-                override = raw_input('File exists. Override? (Default YES)')
+                override = raw_input('File exists. Override? (Default YES): ')
                 if override=='y' or override=='yes' or override=='1' or override=='':
                     break
             break
         elif replay=='yes' or replay=='y' or replay=='1':
             replay = 1
             while True:
-                configName = raw_input('--- Please input the configuration file:')
+                configName = raw_input('--- Please input the configuration file: ')
                 if os.path.exists(configName+'.config'):
                     break
-                print "!!!Error!!! Configuration file is not existed!"
+                print "!Error!Configuration file is not existed!"
             break
 
     setLogLevel('info')
     repeatTimes = 1
     for i in range(0, repeatTimes):
-        mobileNet(name, mptcpEnabled, congestCtl, replay, configName+'.config')
+        mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configName+'.config')

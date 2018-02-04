@@ -155,12 +155,12 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     mSta = 8
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = [2, 2, 8]
+    backhaulBW = [1, 1, 8]
     backhaulDelay = [1, 1, 10]
-    backhaulLoss = 1
+    backhaulLoss = [5, 5, 0]
     lteBW = 5
     lteDelay = 10
-    lteLoss = 1
+    lteLoss = 0
     ethPerSta = 1
     wlanPerSta = 1
     mStart = 0
@@ -247,7 +247,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         if i<=numOfSta:
             demand[sta_name] = 1
         else:
-            demand[sta_name] = 1.5
+            demand[sta_name] = 0.5
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -260,7 +260,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     for i in range(1, numOfAp+numOfLte+1):
         node_u = nodes['s'+str(numOfSwitch)]
         node_d = nodes['s'+str(i)]
-        net.addLink(node_d, node_u, bw=float(backhaulBW[i-1]), delay=str(backhaulDelay[i-1])+'ms', loss=float(backhaulLoss))
+        net.addLink(node_d, node_u, bw=float(backhaulBW[i-1]), delay=str(backhaulDelay[i-1])+'ms', loss=float(backhaulLoss[i-1]))
         capacity['s'+str(i)+'-s'+str(numOfSwitch)] = float(backhaulBW[i-1])
         delay['s'+str(i)+'-s'+str(numOfSwitch)] = float(backhaulDelay[i-1])
 
@@ -402,6 +402,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
             else:
                 out_f = folderName+'/sta'+str(i)+'-wlan0_sptcp.stat'
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan0.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+    os.system('sudo python analysis.py '+(str(range(1, numOfSta+numOfSSta+1))).replace(' ', '')+' '+folderName)
 
     print "*** Stopping network ***"
     net.stop()
@@ -436,8 +437,8 @@ if __name__ == '__main__':
             congestCtl = 'cubic'
             break
     while True:
-        replay = raw_input('--- Is it replaying testing? (Default NO): ')
-        if replay=='no' or replay=='n' or replay=='0' or replay=='':
+        replay = raw_input('--- Replay testing? (Default YES): ')
+        if replay=='no' or replay=='n' or replay=='0':
             replay = 0
             while True:
                 configName = raw_input('--- Please name the configuration file: ')
@@ -447,13 +448,13 @@ if __name__ == '__main__':
                 if override=='y' or override=='yes' or override=='1' or override=='':
                     break
             break
-        elif replay=='yes' or replay=='y' or replay=='1':
+        elif replay=='yes' or replay=='y' or replay=='1' or replay=='':
             replay = 1
             while True:
                 configName = raw_input('--- Please input the configuration file: ')
                 if os.path.exists(configName+'.config'):
                     break
-                print "!Error!Configuration file is not existed!"
+                print "Error. Configuration file is not existed. Please try again. "
             break
 
     setLogLevel('info')

@@ -24,21 +24,26 @@ def getPos(center, range):
     return c[0]+','+c[1]+','+c[2]
 
 
-def deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, replay, config):
+def deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSta, replay, config):
     start = 1
-    for i in range(1, numOfSta+1):
-        if start>numOfAp:
-            start = 1
-        ap_name = 'ap' + str(start)
-        sta_name = 'sta' + str(i)
+    for i in range(1, numOfSta+numOfSSta+1):
         paramOfSta[sta_name] = {}
+        if i<=numOfSta:
+            if start>numOfAp:
+                start = 1
+            ap_name = 'ap'+str(start)
+            paramOfSta[sta_name]['ap'] = start
+        else:
+            ap_name = 'ap'+str(assoOfSSta[i-numOfSta])
+            paramOfSta[sta_name]['ap'] = assoOfSSta[i-numOfSta]
+        sta_name = 'sta'+str(i)
+        
         if replay==1:
             sPos = config.readline().strip('\n')
         else:
             sPos = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])
             config.write(sPos+'\n')
         paramOfSta[sta_name]['sPos'] = sPos
-        paramOfSta[sta_name]['ap'] = start
         start += 1
 
 
@@ -128,7 +133,9 @@ def ITGTest(client, server, bw, sTime):
     info('Sending message from ', client.name, '<->', server.name, '\n')
     client.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
     client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 1000 -O '+str(bw)+' -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log &')
+    client.cmdPrint('PID=$!')
     client.cmd('popd')
+
 
 def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
@@ -141,14 +148,16 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
                 acMode:     (ssf, llf)
                 mobiMode:   (equallyRandom, randomCongest)
     '''
-    numOfAp = 3
+    numOfAp = 2
     numOfLte = 1
-    numOfSta = 5
-    mSta = 3
+    numOfSta = 8
+    numOfSSta = 3
+    assoOfSSta = [1, 1, 1]
+    mSta = 8
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = [8, 3, 8, 15]
-    backhaulDelay = [1, 1, 1, 10]
+    backhaulBW = [2.5, 2.5, 6.5]
+    backhaulDelay = [10, 10, 10]
     backhaulLoss = 1
     lteBW = 5
     lteDelay = 10
@@ -226,22 +235,20 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     '''Update the position of each station'''
     if replay==1:
-        deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, replay, rConfig)
+        deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSta, replay, rConfig)
     else:
-        deployStation(numOfAp, numOfSta, paramOfAp, paramOfSta, replay, wConfig)
+        deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSta, replay, wConfig)
 
     '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
-    for i in range(1, numOfSta + 1):
-        sta_name = 'sta' + str(i)
+    for i in range(1, numOfSta+numOfSSta+1):
+        sta_name = 'sta'+str(i)
         node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
         users.append(sta_name)
         nodes[sta_name] = node
-        demand[sta_name] = 3
-
-    sta6 = net.addStation('sta6', position='110,110,0')
-    users.append('sta6')
-    nodes['sta6'] = sta6
-    demand['sta6'] = 1
+        if i<=numOfSta:
+            demand[sta_name] = 1
+        else:
+            demand[sta_name] = 0.5
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -289,7 +296,6 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     print capacity
     print delay
 
-
     print "*** Building the graph of the simulation ***"
     net.plotGraph(max_x=260, max_y=220)
 
@@ -325,9 +331,11 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
             station.cmd('ip rule add from 10.0.'+str(i+1)+'.'+str(j)+' table '+str(j+1))
             station.cmd('ip route add 10.0.'+str(i+1)+'.'+str(j)+'/32 dev '+sta_name+'-eth'+str(j)+' scope link table '+str(j+1))
             station.cmd('ip route add default via 10.0.'+str(i+1)+'.'+str(j)+' dev '+sta_name+'-eth'+str(j)+' table '+str(j+1))
-
-    sta6.cmd('ifconfig sta6-wlan0 10.0.7.0/32')
-    sta6.cmd('ip route add default via 10.0.7.0 dev sta6-wlan0')
+    for i in range(numOfSta+1, numOfSta+numOfSSta+1):
+        sta_name = 'sta'+str(i)
+        station = nodes[sta_name]
+        station.cmd('ifconfig '+sta_name+'-wlan0 10.0.'+str(i+1)+'.0/32')
+        station.cmd('ip route add default via 10.0.'+str(i+1)+'.0 dev '+str_name+'-wlan0')
 
     print "*** Starting FDM ***"
     FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2, bool(fdmEnabled))
@@ -350,18 +358,18 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     print "*** Starting D-ITG Clients on stations ***"
     time.sleep(1)
-    for i in range(1, numOfSta+1):
+    for i in range(1, numOfSta+numOfSSta+1):
         sender = nodes['sta'+str(i)]
         receiver = nodes['h'+str(1)]
         bwReq = demand['sta'+str(i)]*125
         ITGTest(sender, receiver, bwReq, (mEnd-1)*1000)
-        for j in range(0, wlanPerSta):
-            sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
-        for j in range(wlanPerSta, ethPerSta+wlanPerSta):
-            sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
-
-    ITGTest(sta6, nodes['h1'], 125, (mEnd-1)*1000)
-    sta6.cmd('tcpdump -i sta6-wlan0 -w '+folderName+'/sta6-wlan0.pcap &')
+        if i<=numOfSta:
+            for j in range(0, wlanPerSta):
+                sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
+            for j in range(wlanPerSta, ethPerSta+wlanPerSta):
+                sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
+        else:
+            sender.cmd('tcpdump -i sta'+str(i)+'-wlan0 -w '+folderName+'/sta'+str(i)+'-wlan0.pcap &')
 
     print "*** Simulation is running. Please wait... ***"
 

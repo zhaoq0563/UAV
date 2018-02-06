@@ -320,6 +320,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     # net.seed(20)          # need to figure out what is seed
     net.startMobility(time=0, AC=acMode, model='RandomDirection', max_x=125, max_y=125, min_x=15, min_y=75, max_v=0.8, min_v=0.4)
+    net.stopMobility(time=mEnd)
 
     print "*** Starting network simulation ***"
     net.start()

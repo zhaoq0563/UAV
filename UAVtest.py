@@ -133,7 +133,7 @@ def setMobility(net, nodes, mobileSta, paramOfSta):
 def ITGTest(client, server, bw, sTime):
     info('Sending message from ', client.name, '<->', server.name, '\n')
     client.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
-    client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 500 -O '+str(bw)+' -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log &')
+    client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 500 -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log -B O '+str(bw*2)+' E '+str(bw/2)+' &')
     client.cmdPrint('PID=$!')
     client.cmd('popd')
 
@@ -152,12 +152,12 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     numOfAp = 2
     numOfLte = 1
     numOfSta = 8
-    numOfSSta = 1
-    assoOfSSta = [1]
+    numOfSSta = 2
+    assoOfSSta = [1, 2]
     mSta = 8
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = [5, 8, 25]
+    backhaulBW = [5, 5, 28]
     backhaulDelay = [1, 1, 1]
     backhaulLoss = [5, 5, 0]
     lteBW = 5
@@ -243,16 +243,20 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
     for i in range(1, numOfSta+numOfSSta+1):
         sta_name = 'sta'+str(i)
-        if i==numOfSta+numOfSSta:
-            node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
-        else:
+        if i<=numOfSta:
             node = net.addStation(sta_name)
+        else:
+            node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
         users.append(sta_name)
         nodes[sta_name] = node
         if i<=numOfSta:
             demand[sta_name] = 3
         else:
             demand[sta_name] = 3
+    node = net.addStation('sta'+str(numOfSta+numOfSSta+1), position='5,5,0')
+    users.append('sta'+str(numOfSta+numOfSSta+1))
+    nodes['sta'+str(numOfSta+numOfSSta+1)] = node
+    demand['sta'+str(numOfSta+numOfSSta+1)] = 3
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -281,6 +285,11 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         net.addLink(node_sta, node_lte, bw=float(lteBW), delay=str(lteDelay)+'ms', loss=float(lteLoss))
         capacity['sta'+str(i)+'-s'+str(numOfAp+numOfLte+1)] = float(lteBW)
         delay['sta'+str(i)+'-s'+str(numOfAp+numOfLte+1)] = float(lteDelay)
+    node_lte = nodes['s'+str(numOfAp+numOfLte+1)]
+    node_sta = nodes['sta'+str(numOfSta+numOfSSta+1)]
+    net.addLink(node_sta, node_lte, bw=float(lteBW), delay=str(lteDelay)+'ms', loss=float(lteLoss))
+    capacity[node_sta.name+'-'+node_lte.name] = float(lteBW)
+    delay[node_sta.name+'-'+node_lte.name] = float(lteDelay)
 
     '''Links between APs and switches'''
     for i in range(1, numOfAp+1):
@@ -346,12 +355,16 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         station = nodes[sta_name]
         station.cmd('ifconfig '+sta_name+'-wlan0 10.0.'+str(i+1)+'.0/32')
         station.cmd('ip route add default via 10.0.'+str(i+1)+'.0 dev '+sta_name+'-wlan0')
+    station = nodes['sta'+str(numOfSta+numOfSSta+1)]
+    station.cmd('ifconfig '+station.name+'-wlan0 10.0.'+str(numOfSta+numOfSSta+1+1)+'.0/32')
+    station.cmd('ifconfig '+station.name+'-eth1 10.0.'+str(numOfSta+numOfSSta+1+1)+'.1/32')
+    station.cmd('ip route add default scope global nexthop via 10.0.'+str(numOfSta+numOfSSta+1+1)+'.1 dev '+station.name+'-eth1')
 
     print "*** Starting FDM ***"
     FDM(net, users, nets, demand, capacity, delay, 0, mEnd-5, 2, bool(fdmEnabled))
 
     # print "***Running CLI"
-    #CLI(net)
+    # CLI(net)
 
     print "*** Starting D-ITG Server on host ***"
     host = nodes['h1']
@@ -368,7 +381,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     print "*** Starting D-ITG Clients on stations ***"
     time.sleep(1)
-    for i in range(1, numOfSta+numOfSSta+1):
+    for i in range(1, numOfSta+numOfSSta+1+1):
         sender = nodes['sta'+str(i)]
         receiver = nodes['h'+str(1)]
         bwReq = demand['sta'+str(i)]*250
@@ -378,10 +391,12 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
                 sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
             for j in range(wlanPerSta, ethPerSta+wlanPerSta):
                 sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
-        else:
+        elif i>numOfSta and i<numOfSta+numOfSSta+1:
             sender.cmd('tcpdump -i sta'+str(i)+'-wlan0 -w '+folderName+'/sta'+str(i)+'-wlan0.pcap &')
+        else:
+            sender.cmd('tcpdump -i sta'+str(i)+'-eth1 -w '+folderName+'/sta'+str(i)+'-eth1.pcap &')
 
-    nodes['s1'].cmd('tcpdump -i s1-eth2 -w '+folderName+'/s1-eth2.pcap &')
+    # nodes['s1'].cmd('tcpdump -i s1-eth2 -w '+folderName+'/s1-eth2.pcap &')
 
     print "*** Simulation is running. Please wait... ***"
 
@@ -392,7 +407,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     host.cmdPrint('kill $PID')
 
     print "*** Data processing ***"
-    for i in range(1, numOfSta+numOfSSta+1):
+    for i in range(1, numOfSta+numOfSSta+1+1):
         if i<=numOfSta:
             for j in range(0, wlanPerSta):
                 ip = '10.0.'+str(i+1)+'.'+str(j)
@@ -408,14 +423,21 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
                 else:
                     out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_sptcp.stat'
                 nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
-        else:
+        elif i>numOfSta and i<numOfSta+numOfSSta+1:
             ip ='10.0.'+str(i+1)+'.0'
             if mptcpEnabled:
                 out_f = folderName+'/sta'+str(i)+'-wlan0_mptcp.stat'
             else:
                 out_f = folderName+'/sta'+str(i)+'-wlan0_sptcp.stat'
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan0.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
-    os.system('sudo python analysis.py '+(str(range(1, numOfSta+numOfSSta+1))).replace(' ', '')+' '+folderName)
+        else:
+            ip = '10.0.'+str(i+1)+'.0'
+            if mptcpEnabled:
+                out_f = folderName+'/sta'+str(i)+'-eth1_mptcp.stat'
+            else:
+                out_f = folderName+'/sta'+str(i)+'-eth1_sptcp.stat'
+            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth1.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+    os.system('sudo python analysis.py '+(str(range(1, numOfSta+numOfSSta+1+1))).replace(' ', '')+' '+folderName)
 
     print "*** Stopping network ***"
     net.stop()

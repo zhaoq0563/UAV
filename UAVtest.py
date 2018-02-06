@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-from mininet.fdm import FDM
+from mininet.fdm_intf_handoff import FDM
 from mininet.net import Mininet
 from mininet.node import OVSKernelAP
 from mininet.link import TCLink
@@ -73,7 +73,7 @@ def equRanMobility(*args):
     for i in range(1, mSta+1):
         sta_name = 'sta'+str(mStaSet[i-1])
         mobileSta.append(sta_name)                                                              # decide which sta to move
-        speed = random.uniform(0.5, 1)                                                          # decide the speed for the sta
+        speed = random.uniform(3, 5)                                                            # decide the speed for the sta
         while True:                                                                             # decide the destination ap
             desAp = random.randint(1, numOfAp)
             if desAp!=paramOfSta[sta_name]['ap']:
@@ -99,8 +99,8 @@ def ranConMobility(*args):
     mSta = numOfSta                                                                             # decide all sta move
     desAp = random.randint(1, numOfAp)                                                          # decide the destination ap
     ap_name = 'ap'+str(desAp)
-    speed = random.uniform(0.5, 1)                                                              # decide the speed for the sta
     for i in range(1, mSta+1):
+        speed = random.uniform(0.5, 1)                                                          # decide the speed for the sta
         sta_name = 'sta'+str(i)
         paramOfSta[sta_name]['desAp'] = desAp
         paramOfSta[sta_name]['sTime'] = random.randint(1, 20)                                   # decide the start time
@@ -119,12 +119,14 @@ def ranConMobility(*args):
 
 def setMobility(net, nodes, mobileSta, paramOfSta):
     max = 0
+
     for i in mobileSta:
         print i + ':' + str(paramOfSta[i]['sTime']) + '  ' + paramOfSta[i]['sPos'] + '   ' + str(paramOfSta[i]['eTime']) + '  ' + paramOfSta[i]['ePos']
         net.mobility(nodes[i], 'start', time=paramOfSta[i]['sTime'], position=paramOfSta[i]['sPos'])
         net.mobility(nodes[i], 'stop', time=paramOfSta[i]['eTime'], position=paramOfSta[i]['ePos'])
         if paramOfSta[i]['eTime']>max:
             max = paramOfSta[i]['eTime']
+
     return max
 
 
@@ -155,11 +157,11 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     mSta = 8
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = [1, 1, 8]
-    backhaulDelay = [1, 1, 10]
+    backhaulBW = [5, 8, 25]
+    backhaulDelay = [1, 1, 1]
     backhaulLoss = [5, 5, 0]
     lteBW = 5
-    lteDelay = 10
+    lteDelay = 50
     lteLoss = 0
     ethPerSta = 1
     wlanPerSta = 1
@@ -241,13 +243,16 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
     for i in range(1, numOfSta+numOfSSta+1):
         sta_name = 'sta'+str(i)
-        node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
+        if i==numOfSta+numOfSSta:
+            node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
+        else:
+            node = net.addStation(sta_name)
         users.append(sta_name)
         nodes[sta_name] = node
         if i<=numOfSta:
-            demand[sta_name] = 1
+            demand[sta_name] = 3
         else:
-            demand[sta_name] = 0.5
+            demand[sta_name] = 3
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -299,17 +304,22 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     net.plotGraph(max_x=260, max_y=220)
 
     print "*** Configuring mobility ***"
-    net.startMobility(time=mStart, AC=acMode)
+    # net.startMobility(time=mStart, AC=acMode)
+    #
+    # if replay==1:
+    #     loadMobilityParams(paramOfSta, mobileSta, rConfig)
+    #     rConfig.close()
+    # else:
+    #     deployMobility(mobiMode, numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta, wConfig)
+    #     wConfig.close()
+    # mEnd = setMobility(net, nodes, mobileSta, paramOfSta)
+    #
+    # net.stopMobility(time=mEnd)
 
-    if replay==1:
-        loadMobilityParams(paramOfSta, mobileSta, rConfig)
-        rConfig.close()
-    else:
-        deployMobility(mobiMode, numOfAp, paramOfAp, numOfSta, paramOfSta, mSta, mobileSta, wConfig)
-        wConfig.close()
-    mEnd = setMobility(net, nodes, mobileSta, paramOfSta)+20
+    mEnd = 100
 
-    net.stopMobility(time=mEnd)
+    # net.seed(20)          # need to figure out what is seed
+    net.startMobility(time=0, AC=acMode, model='RandomDirection', max_x=125, max_y=125, min_x=15, min_y=75, max_v=0.8, min_v=0.4)
 
     print "*** Starting network simulation ***"
     net.start()
@@ -337,7 +347,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         station.cmd('ip route add default via 10.0.'+str(i+1)+'.0 dev '+sta_name+'-wlan0')
 
     print "*** Starting FDM ***"
-    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2, bool(fdmEnabled))
+    FDM(net, users, nets, demand, capacity, delay, 0, mEnd-5, 2, bool(fdmEnabled))
 
     # print "***Running CLI"
     #CLI(net)
@@ -369,6 +379,8 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
                 sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
         else:
             sender.cmd('tcpdump -i sta'+str(i)+'-wlan0 -w '+folderName+'/sta'+str(i)+'-wlan0.pcap &')
+
+    nodes['s1'].cmd('tcpdump -i s1-eth2 -w '+folderName+'/s1-eth2.pcap &')
 
     print "*** Simulation is running. Please wait... ***"
 

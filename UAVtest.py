@@ -171,11 +171,19 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     print "*** Loading the parameters for simulation ***"
     params = []
-    config = open(configFile, 'a+')
-    config.seek(0)
-    line = config.readline().strip('\n')
-    while line!='END':
-        params.append(eval(line.split(':')[1]))
+    config = open(configFile, 'r+')
+    line = config.readline()
+    if not replay:
+        tempConfig = line
+    while line!='END\n':
+        params.append(eval(line.strip('\n').split(':')[1]))
+        line = config.readline()
+        if not replay:
+            tempConfig.append(line)
+    if not replay:
+        tempConfig.append(line)
+        config.truncate()
+        config.writelines(tempConfig)
     (numOfAp, numOfLte, numOfSPSta, numOfMPSta, numOfFixApSta, assoOfFixApSta, numOfFixLteSta, assoOfFixLteSta, backhaulBW, backhaulDelay, backhaulLoss, lteBW, lteDelay, lteLoss) = params
 
     # numOfAp = 2
@@ -220,11 +228,6 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     paramOfAp = {}
     mobileSta = []
     paramOfSta = {}
-
-    if replay==1:
-        rConfig = open(configFile, 'r')
-    else:
-        wConfig = open(configFile, 'w')
 
     net = Mininet(controller=None, accessPoint=OVSKernelAP, link=TCLink, autoSetMacs=True)
 

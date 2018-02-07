@@ -178,20 +178,20 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         params.append(eval(line.split(':')[1]))
     (numOfAp, numOfLte, numOfSPSta, numOfMPSta, numOfFixApSta, assoOfFixApSta, numOfFixLteSta, assoOfFixLteSta, backhaulBW, backhaulDelay, backhaulLoss, lteBW, lteDelay, lteLoss) = params
 
-    numOfAp = 2
-    numOfLte = 1
-    numOfSta = 8
-    numOfSSta = 2
-    assoOfSSta = [1, 2]
-    mSta = 8
+    # numOfAp = 2
+    # numOfLte = 1
+    # numOfSta = 8
+    # numOfSSta = 2
+    # assoOfSSta = [1, 2]
+    # mSta = 8
     propModel = "logDistance"
     exponent = 4
-    backhaulBW = [5, 5, 28]
-    backhaulDelay = [1, 1, 1]
-    backhaulLoss = [5, 5, 0]
-    lteBW = 5
-    lteDelay = 50
-    lteLoss = 0
+    # backhaulBW = [5, 5, 28]
+    # backhaulDelay = [1, 1, 1]
+    # backhaulLoss = [5, 5, 0]
+    # lteBW = 5
+    # lteDelay = 50
+    # lteLoss = 0
     ethPerSta = 1
     wlanPerSta = 1
     mStart = 0

@@ -24,19 +24,15 @@ def getPos(center, range):
     return c[0]+','+c[1]+','+c[2]
 
 
-def deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSta, replay, config):
+def deployStation(numOfAp, numOfSPSta, numOfMPSta, numOfFixApSta, assoOfFixApSta, numOfFixLteSta, assoOfFixLteSta, paramOfAp, paramOfSta, replay, config):
     start = 1
-    for i in range(1, numOfSta+numOfSSta+1):
+    for i in range(1, numOfSPSta+numOfMPSta+1):
         sta_name = 'sta'+str(i)
+        if start>numOfAp:
+            start = 1
+        ap_name = 'ap'+str(start)
         paramOfSta[sta_name] = {}
-        if i<=numOfSta:
-            if start>numOfAp:
-                start = 1
-            ap_name = 'ap'+str(start)
-            paramOfSta[sta_name]['ap'] = start
-        else:
-            ap_name = 'ap'+str(assoOfSSta[i-numOfSta-1])
-            paramOfSta[sta_name]['ap'] = assoOfSSta[i-numOfSta-1]
+        paramOfSta[sta_name]['ap'] = start
         if replay==1:
             sPos = config.readline().strip('\n')
         else:
@@ -44,6 +40,29 @@ def deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSt
             config.write(sPos+'\n')
         paramOfSta[sta_name]['sPos'] = sPos
         start += 1
+
+    for (i, j) in zip(range(numOfSPSta+numOfMPSta+1, numOfSPSta+numOfMPSta+numOfFixApSta+1), range(1, numOfFixApSta+1)):
+        sta_name = 'sta'+str(i)
+        ap_name = 'ap'+str(assoOfFixApSta[j])
+        paramOfSta[sta_name] = {}
+        paramOfSta[sta_name]['ap'] = assoOfFixApSta[j]
+        if replay==1:
+            sPos = config.readline().strip('\n')
+        else:
+            sPos = getPos(paramOfAp[ap_name][0], paramOfAp[ap_name][1])
+            config.write(sPos+'\n')
+        paramOfSta[sta_name]['sPos'] = sPos
+
+    for (i, j) in zip(range(numOfSPSta+numOfMPSta+numOfFixApSta+1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1), range(1, numOfFixLteSta+1)):
+        sta_name = 'sta'+str(i)
+        ap_name = 's'+str(assoOfFixLteSta[j])
+        paramOfSta[sta_name] = {}
+        if replay==1:
+            sPos = config.readline().strip('\n')
+        else:
+            sPos = str(random.randint(1, 10))+','+str(random.randint(1, 10))+',0'
+            config.write(sPos+'\n')
+        paramOfSta[sta_name]['sPos'] = sPos
 
 
 def loadMobilityParams(paramOfSta, mobileSta, config):
@@ -134,7 +153,7 @@ def ITGTest(client, server, bw, sTime):
     info('Sending message from ', client.name, '<->', server.name, '\n')
     client.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
     client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 500 -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log -B O '+str(bw*2)+' E '+str(bw/2)+' &')
-    client.cmdPrint('PID=$!')
+    client.cmd('PID=$!')
     client.cmd('popd')
 
 
@@ -149,6 +168,16 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
                 acMode:     (ssf, llf)
                 mobiMode:   (equallyRandom, randomCongest)
     '''
+
+    print "*** Loading the parameters for simulation ***"
+    params = []
+    config = open(configFile, 'a+')
+    config.seek(0)
+    line = config.readline().strip('\n')
+    while line!='END':
+        params.append(eval(line.split(':')[1]))
+    (numOfAp, numOfLte, numOfSPSta, numOfMPSta, numOfFixApSta, assoOfFixApSta, numOfFixLteSta, assoOfFixLteSta, backhaulBW, backhaulDelay, backhaulLoss, lteBW, lteDelay, lteLoss) = params
+
     numOfAp = 2
     numOfLte = 1
     numOfSta = 8
@@ -224,10 +253,10 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         ap_range = '40'
 
         if replay==1:
-            ap_pos = rConfig.readline().strip('\n')
+            ap_pos = config.readline().strip('\n')
         else:
             ap_pos = str(40+60*(i-1))+',100,0'
-            wConfig.write(ap_pos+'\n')
+            config.write(ap_pos+'\n')
 
         paramOfAp[ap_name] = [ap_pos, ap_range]
         node = net.addAccessPoint(ap_name, ssid=ap_ssid, mode=ap_mode, channel=ap_chan, position=ap_pos, range=ap_range)
@@ -235,28 +264,21 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
         nodes[ap_name] = node
 
     '''Update the position of each station'''
-    if replay==1:
-        deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSta, replay, rConfig)
-    else:
-        deployStation(numOfAp, numOfSta, numOfSSta, assoOfSSta, paramOfAp, paramOfSta, replay, wConfig)
+    deployStation(numOfAp, numOfSPSta, numOfMPSta, numOfFixApSta, assoOfFixApSta, numOfFixLteSta, assoOfFixLteSta, paramOfAp, paramOfSta, replay, config)
 
     '''Station : Defaultly set up the stations with 1 eth and 1 wlan interfaces'''
-    for i in range(1, numOfSta+numOfSSta+1):
+    for i in range(1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1):
         sta_name = 'sta'+str(i)
-        if i<=numOfSta:
+        if i<=numOfSPSta+numOfMPSta:
             node = net.addStation(sta_name)
         else:
             node = net.addStation(sta_name, position=paramOfSta[sta_name]['sPos'])
         users.append(sta_name)
         nodes[sta_name] = node
-        if i<=numOfSta:
+        if i<=numOfSPSta+numOfMPSta:
             demand[sta_name] = 3
         else:
             demand[sta_name] = 3
-    node = net.addStation('sta'+str(numOfSta+numOfSSta+1), position='5,5,0')
-    users.append('sta'+str(numOfSta+numOfSSta+1))
-    nodes['sta'+str(numOfSta+numOfSSta+1)] = node
-    demand['sta'+str(numOfSta+numOfSSta+1)] = 3
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -279,17 +301,19 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     net.addLink(node_d, node_h)
 
     '''Links between stations and LTE switch'''
-    for i in range(1, numOfSta+1):
+    MPStaSet = random.sample(range(1, numOfSPSta+numOfMPSta+1), numOfMPSta)
+    for i in MPStaSet:
         node_lte = nodes['s'+str(numOfAp+numOfLte+1)]
         node_sta = nodes['sta'+str(i)]
         net.addLink(node_sta, node_lte, bw=float(lteBW), delay=str(lteDelay)+'ms', loss=float(lteLoss))
-        capacity['sta'+str(i)+'-s'+str(numOfAp+numOfLte+1)] = float(lteBW)
-        delay['sta'+str(i)+'-s'+str(numOfAp+numOfLte+1)] = float(lteDelay)
-    node_lte = nodes['s'+str(numOfAp+numOfLte+1)]
-    node_sta = nodes['sta'+str(numOfSta+numOfSSta+1)]
-    net.addLink(node_sta, node_lte, bw=float(lteBW), delay=str(lteDelay)+'ms', loss=float(lteLoss))
-    capacity[node_sta.name+'-'+node_lte.name] = float(lteBW)
-    delay[node_sta.name+'-'+node_lte.name] = float(lteDelay)
+        capacity[node_sta.name+'-'+node_lte.name] = float(lteBW)
+        delay[node_sta.name+'-'+node_lte.name] = float(lteDelay)
+    for (i, j) in zip(range(numOfSPSta+numOfMPSta+numOfFixApSta+1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1), range(1, numOfFixLteSta+1)):
+        node_lte = nodes['s'+str(assoOfFixLteSta[j])]
+        node_sta = nodes['sta'+str(i)]
+        net.addLink(node_sta, node_lte, bw=float(lteBW), delay=str(lteDelay)+'ms', loss=float(lteLoss))
+        capacity[node_sta.name+'-'+node_lte.name] = float(lteBW)
+        delay[node_sta.name+'-'+node_lte.name] = float(lteDelay)
 
     '''Links between APs and switches'''
     for i in range(1, numOfAp+1):
@@ -335,7 +359,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     net.start()
 
     print "*** Addressing for station ***"
-    for i in range(1, numOfSta+1):
+    for i in MPStaSet:
         sta_name = 'sta'+str(i)
         station = nodes[sta_name]
         for j in range(0, wlanPerSta):
@@ -350,18 +374,31 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
             station.cmd('ip rule add from 10.0.'+str(i+1)+'.'+str(j)+' table '+str(j+1))
             station.cmd('ip route add 10.0.'+str(i+1)+'.'+str(j)+'/32 dev '+sta_name+'-eth'+str(j)+' scope link table '+str(j+1))
             station.cmd('ip route add default via 10.0.'+str(i+1)+'.'+str(j)+' dev '+sta_name+'-eth'+str(j)+' table '+str(j+1))
-    for i in range(numOfSta+1, numOfSta+numOfSSta+1):
+    for i in range(1, numOfSPSta+numOfMPSta+1):
+        if i not in MPStaSet:
+            sta_name = 'sta'+str(i)
+            station = nodes[sta_name]
+            station.cmd('ifconfig '+sta_name+'-wlan0 10.0.'+str(i+1)+'.0/32')
+            station.cmd('ip route add default via 10.0.'+str(i+1)+'.0 dev '+sta_name+'-wlan0')
+    for i in range(numOfSPSta+numOfMPSta+1, numOfSPSta+numOfMPSta+numOfFixApSta+1):
         sta_name = 'sta'+str(i)
         station = nodes[sta_name]
         station.cmd('ifconfig '+sta_name+'-wlan0 10.0.'+str(i+1)+'.0/32')
         station.cmd('ip route add default via 10.0.'+str(i+1)+'.0 dev '+sta_name+'-wlan0')
-    station = nodes['sta'+str(numOfSta+numOfSSta+1)]
-    station.cmd('ifconfig '+station.name+'-wlan0 10.0.'+str(numOfSta+numOfSSta+1+1)+'.0/32')
-    station.cmd('ifconfig '+station.name+'-eth1 10.0.'+str(numOfSta+numOfSSta+1+1)+'.1/32')
-    station.cmd('ip route add default scope global nexthop via 10.0.'+str(numOfSta+numOfSSta+1+1)+'.1 dev '+station.name+'-eth1')
+    for i in range(numOfSPSta+numOfMPSta+numOfFixApSta+1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1):
+        sta_name = 'sta'+str(i)
+        station = nodes[sta_name]
+        station.cmd('ifconfig '+sta_name+'-eth1 10.0.'+str(i+1)+'.1/32')
+        station.cmd('ip route add default scope global nexthop via 10.0.'+str(numOfSta+numOfSSta+1+1)+'.1 dev '+station.name+'-eth1')
 
     print "*** Starting FDM ***"
-    FDM(net, users, nets, demand, capacity, delay, 0, mEnd-5, 2, bool(fdmEnabled))
+    if mptcpEnabled and fdmEnabled:
+        protocol = 'FDM'
+    elif mptcpEnabled:
+        protocol = 'MPTCP'
+    else:
+        protocol = 'SPTCP'
+    FDM(net, users, nets, demand, capacity, delay, 0, mEnd-5, 2, bool(fdmEnabled), protocol)
 
     # print "***Running CLI"
     # CLI(net)
@@ -371,7 +408,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     info('Starting D-ITG server...\n')
     host.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
     host.cmd('./ITGRecv &')
-    host.cmdPrint('PID=$!')
+    host.cmd('PID=$!')
     host.cmd('popd')
     if not os.path.exists(folderName):
         os.mkdir(folderName)
@@ -381,17 +418,17 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
 
     print "*** Starting D-ITG Clients on stations ***"
     time.sleep(1)
-    for i in range(1, numOfSta+numOfSSta+1+1):
+    for i in range(1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1):
         sender = nodes['sta'+str(i)]
         receiver = nodes['h'+str(1)]
         bwReq = demand['sta'+str(i)]*250
         ITGTest(sender, receiver, bwReq, (mEnd-1)*1000)
-        if i<=numOfSta:
+        if i<=numOfSPSta+numOfMPSta and i in MPStaSet:
             for j in range(0, wlanPerSta):
                 sender.cmd('tcpdump -i sta'+str(i)+'-wlan'+str(j)+' -w '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap &')
             for j in range(wlanPerSta, ethPerSta+wlanPerSta):
                 sender.cmd('tcpdump -i sta'+str(i)+'-eth'+str(j)+' -w '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap &')
-        elif i>numOfSta and i<numOfSta+numOfSSta+1:
+        elif i<=numOfSPSta+numOfMPSta+numOfFixApSta:
             sender.cmd('tcpdump -i sta'+str(i)+'-wlan0 -w '+folderName+'/sta'+str(i)+'-wlan0.pcap &')
         else:
             sender.cmd('tcpdump -i sta'+str(i)+'-eth1 -w '+folderName+'/sta'+str(i)+'-eth1.pcap &')
@@ -407,8 +444,8 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
     host.cmdPrint('kill $PID')
 
     print "*** Data processing ***"
-    for i in range(1, numOfSta+numOfSSta+1+1):
-        if i<=numOfSta:
+    for i in range(1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1):
+        if i<=numOfSPSta+numOfMPSta and i in MPStaSet:
             for j in range(0, wlanPerSta):
                 ip = '10.0.'+str(i+1)+'.'+str(j)
                 if mptcpEnabled:
@@ -423,7 +460,7 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
                 else:
                     out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_sptcp.stat'
                 nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
-        elif i>numOfSta and i<numOfSta+numOfSSta+1:
+        elif i<=numOfSPSta+numOfMPSta+numOfFixApSta:
             ip ='10.0.'+str(i+1)+'.0'
             if mptcpEnabled:
                 out_f = folderName+'/sta'+str(i)+'-wlan0_mptcp.stat'
@@ -437,14 +474,24 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, replay, configFile):
             else:
                 out_f = folderName+'/sta'+str(i)+'-eth1_sptcp.stat'
             nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth1.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
-    os.system('sudo python analysis.py '+(str(range(1, numOfSta+numOfSSta+1+1))).replace(' ', '')+' '+folderName)
+    os.system('sudo python analysis.py '+(str(range(1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1))).replace(' ', '')+' '+folderName)
 
     print "*** Stopping network ***"
     net.stop()
 
 
 if __name__ == '__main__':
-    print "*** Welcome to the Mininet simulation. ***"
+    print "*** *** *** *** *** *** *** *** *** *** ***"
+    print "***  Welcome to the Mininet simulation  ***"
+    print "*** *** *** *** *** *** *** *** *** *** ***"
+    while True:
+        print "\n--- Available configuration: " 
+        for config in os.listdir('.'):
+            if '.config' in config:
+                print config.strip('.config')
+        configName = raw_input('--- Please select the configuration file: ')
+        if os.path.exists(configName+'.config'):
+            break
     while True:
         name = raw_input('--- Please name this testing: ')
         break
@@ -472,16 +519,10 @@ if __name__ == '__main__':
             congestCtl = 'cubic'
             break
     while True:
-        replay = raw_input('--- Replay testing? (Default YES): ')
+        replay = raw_input('--- Replay mobility? (Default YES): ')
         if replay=='no' or replay=='n' or replay=='0':
             replay = 0
-            while True:
-                configName = raw_input('--- Please name the configuration file: ')
-                if not os.path.exists(configName+'.config'):
-                    break
-                override = raw_input('File exists. Override? (Default YES): ')
-                if override=='y' or override=='yes' or override=='1' or override=='':
-                    break
+            
             break
         elif replay=='yes' or replay=='y' or replay=='1' or replay=='':
             replay = 1

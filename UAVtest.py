@@ -213,7 +213,7 @@ def sendingIperfTraffic(nodes, folderName, numOfSPSta, numOfMPSta, numOfFixApSta
 def ITGTest(client, server, bw, sTime):
     info('Sending message from ', client.name, '<->', server.name, '\n')
     client.cmd('pushd ~/D-ITG-2.8.1-r1023/bin')
-    client.cmd('./ITGSend -T TCP -a 10.0.0.1 -c 500 -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log -B O '+str(bw*2)+' E '+str(bw/2)+' &')
+    client.cmdPrint('./ITGSend -T TCP -a 10.0.0.1 -c 500 -m rttm -O '+str(bw)+' -t '+str(sTime)+' -l log/'+str(client.name)+'.log -x log/'+str(client.name)+'-'+str(server.name)+'.log &')
     client.cmd('PID_'+client.name+'=$!')
     client.cmd('popd')
 
@@ -222,12 +222,13 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, trafficGen, replay, co
 
     call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_enabled="+str(mptcpEnabled)])
     call(["sudo", "modprobe", "mptcp_coupled"])
+    call(["sudo", "sysctl", "-w", "net.mptcp.mptcp_scheduler=roundrobin"])
     call(["sudo", "sysctl", "-w", "net.ipv4.tcp_congestion_control="+congestCtl])
 
     '''Parameters for simulation
-    Parameter:  propModel:  (logDistance)
-                acMode:     (ssf, llf)
-                mobiMode:   (equallyRandom, randomCongest)
+       Parameter:  propModel:  (logDistance)
+                   acMode:     (ssf, llf)
+                   mobiMode:   (equallyRandom, randomCongest)
     '''
 
     print "*** Loading the parameters for simulation ***"
@@ -262,15 +263,15 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, trafficGen, replay, co
     delay = {}
 
     '''Date needed for mobility
-    Parameter:  paramOfAp { key: str(AP name), value: [str(AP center position), str(AP range)] }
-                mobileSta [ str(name of the moving station) ]
-                paramOfSta { key: str(Station name), value: { key: 'ap',    value: (int)index of currently connected ap }
-                                                            { key: 'desAp', value: (int)index of which ap the station goes }
-                                                            { key: 'sPos',  value: (str)starting position of the station }
-                                                            { key: 'ePos',  value: (str)ending position of the station }
-                                                            { key: 'sTime', value: (int)starting time of the station }
-                                                            { key: 'eTime', value: (int)ending time of the station }
-                           }
+       Parameter:  paramOfAp { key: str(AP name), value: [str(AP center position), str(AP range)] }
+                   mobileSta [ str(name of the moving station) ]
+                   paramOfSta { key: str(Station name), value: { key: 'ap',    value: (int)index of currently connected ap }
+                                                               { key: 'desAp', value: (int)index of which ap the station goes }
+                                                               { key: 'sPos',  value: (str)starting position of the station }
+                                                               { key: 'ePos',  value: (str)ending position of the station }
+                                                               { key: 'sTime', value: (int)starting time of the station }
+                                                               { key: 'eTime', value: (int)ending time of the station }
+                              }
     '''
     paramOfAp = {}
     mobileSta = []
@@ -326,9 +327,9 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, trafficGen, replay, co
         users.append(sta_name)
         nodes[sta_name] = node
         if i<=numOfSPSta+numOfMPSta:
-            demand[sta_name] = 4
+            demand[sta_name] = 2
         else:
-            demand[sta_name] = 4
+            demand[sta_name] = 2
 
     print "*** Configuring propagation model ***"
     net.propagationModel(model=propModel, exp=exponent)
@@ -400,7 +401,8 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, trafficGen, replay, co
     # net.stopMobility(time=mEnd)
 
     # net.seed(20)          # need to figure out what is seed
-    net.startMobility(time=mStart, AC=acMode, model='RandomDirection', max_x=125, max_y=125, min_x=15, min_y=75, max_v=0.8, min_v=0.4)
+
+    net.startMobility(time=mStart, AC=acMode, model='RandomDirection', max_x=185, max_y=125, min_x=15, min_y=75, max_v=0.8, min_v=0.4)
     net.stopMobility(time=mEnd)
 
     config.close()
@@ -450,22 +452,25 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, trafficGen, replay, co
     else:
         protocol = 'SPTCP'
 
-    time.sleep(1)
-    FDM(net, users, nets, demand, capacity, delay, 0, mEnd-5, 2, bool(fdmEnabled), protocol)
+    FDM(net, users, nets, demand, capacity, delay, 0, mEnd, 2, bool(fdmEnabled), protocol)
+    time.sleep(5)
 
     # print "***Running CLI"
     # CLI(net)
 
     print "*** Starting to generate the traffic ***"
     if trafficGen=='ditg':
-        sendingDITGTraffic(nodes, folderName, numOfSPSta, numOfMPSta, numOfFixApSta, numOfFixLteSta, demand, mEnd, MPStaSet, ethPerSta, wlanPerSta)
+        sendingDITGTraffic(nodes, folderName, numOfSPSta, numOfMPSta, numOfFixApSta, numOfFixLteSta, demand, mEnd-5, MPStaSet, ethPerSta, wlanPerSta)
     elif trafficGen=='iperf':
-        sendingIperfTraffic(nodes, folderName, numOfSPSta, numOfMPSta, numOfFixApSta, numOfFixLteSta, mEnd, MPStaSet, ethPerSta, wlanPerSta)
+        sendingIperfTraffic(nodes, folderName, numOfSPSta, numOfMPSta, numOfFixApSta, numOfFixLteSta, mEnd-5, MPStaSet, ethPerSta, wlanPerSta)
     else:
         info('Wrong traffic generator selected.\n')
 
     print "*** Simulation is running. Please wait... ***"
-    time.sleep(mEnd)
+    time.sleep(mEnd-5)
+
+    # print "*** Stopping FDM ***"
+    # fdm.terminateT()
 
     print "*** Stopping traffic generator on host ***"
     nodes['h1'].cmd('kill $PID')
@@ -479,28 +484,28 @@ def mobileNet(name, mptcpEnabled, fdmEnabled, congestCtl, trafficGen, replay, co
                     out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_mptcp.stat'
                 else:
                     out_f = folderName+'/sta'+str(i)+'-wlan'+str(j)+'_sptcp.stat'
-                nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+                nodes['sta'+str(i)].cmdPrint('tshark -r '+folderName+'/sta'+str(i)+'-wlan'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
             for j in range(wlanPerSta, ethPerSta+wlanPerSta):
                 ip = '10.0.'+str(i+1)+'.'+str(j)
                 if mptcpEnabled:
                     out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_mptcp.stat'
                 else:
                     out_f = folderName + '/sta' + str(i) + '-eth' + str(j) + '_sptcp.stat'
-                nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+                nodes['sta'+str(i)].cmdPrint('tshark -r '+folderName+'/sta'+str(i)+'-eth'+str(j)+'.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
         elif i<=numOfSPSta+numOfMPSta+numOfFixApSta:
             ip ='10.0.'+str(i+1)+'.0'
             if mptcpEnabled:
                 out_f = folderName+'/sta'+str(i)+'-wlan0_mptcp.stat'
             else:
                 out_f = folderName+'/sta'+str(i)+'-wlan0_sptcp.stat'
-            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-wlan0.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+            nodes['sta'+str(i)].cmdPrint('tshark -r '+folderName+'/sta'+str(i)+'-wlan0.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
         else:
             ip = '10.0.'+str(i+1)+'.0'
             if mptcpEnabled:
                 out_f = folderName+'/sta'+str(i)+'-eth1_mptcp.stat'
             else:
                 out_f = folderName+'/sta'+str(i)+'-eth1_sptcp.stat'
-            nodes['sta'+str(i)].cmd('tshark -r '+folderName+'/sta'+str(i)+'-eth1.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
+            nodes['sta'+str(i)].cmdPrint('tshark -r '+folderName+'/sta'+str(i)+'-eth1.pcap -qz \"io,stat,0,BYTES()ip.src=='+ip+',AVG(tcp.analysis.ack_rtt)tcp.analysis.ack_rtt&&ip.addr=='+ip+'\" >'+out_f)
     if trafficGen == 'ditg':
         os.system('sudo python analysis.py '+(str(range(1, numOfSPSta+numOfMPSta+numOfFixApSta+numOfFixLteSta+1))).replace(' ', '')+' '+folderName)
 

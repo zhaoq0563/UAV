@@ -4,5 +4,9 @@
 .idea/
 results/
 pcap_*/
+plot/FDM
+plot/multi
+plot/single
+plot/*.txt
 *FTConfig*.sh
 *QConfig*.sh

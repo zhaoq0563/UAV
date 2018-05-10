@@ -134,7 +134,7 @@ if __name__ == '__main__':
     ax3.set_xlabel('Protocols')
     ax3.set_ylabel('Average Goodput (Mbps)')
     ax3.set_xticks(index )
-    ax3.set_ylim([0,1])
+    ax3.set_ylim([0,2])
     ax3.set_xticklabels(["FDM","MPTCP","SPTCP"])
 
 

@@ -9,30 +9,36 @@ def getStat(dir, senderNumber, protocol):
     for i in range(1, senderNumber+1):
         ethfname = dir+'sta'+str(i)+'-eth1_'+protocol+'.stat'
         wlanfname = dir + 'sta' + str(i) + '-wlan0_'+protocol+'.stat'
-        throughtput, delay, byte=(0.0,0.0,0)
+        throughtput, delay, byte = (0.0, 0.0, 0.0)
 
-        f1=open(ethfname,'r')
-        f2=open(wlanfname, 'r')
-
-        for line in f1:
-            if line.startswith('|'):
-                l = line.strip().strip('|').split()
-                if '<>' in l:
-                    duration = float(l[2])
-                    byte += float(l[8])
-                    throughtput += float(l[8])*8/duration
-                    delay += byte*float(l[10])
-        for line in f2:
-            if line.startswith('|'):
-                l = line.strip().strip('|').split()
-                if '<>' in l:
-                    duration = float(l[2])
-                    byte += float(l[8])
-                    throughtput += float(l[8])*8/duration
-                    delay += byte*float(l[10])
-        f1.close()
-        f2.close()
-        delay /= byte
+        if os.path.isfile(ethfname):
+            f1 = open(ethfname, 'r')
+            for line in f1:
+                if line.startswith('|'):
+                    l = line.strip().strip('|').split()
+                    if '<>' in l:
+                        duration = float(l[2])
+                        byte += float(l[8])
+                        if duration!=0:
+                            throughtput += float(l[8])*8/(duration*10**6)
+                        delay += byte*float(l[10])
+            f1.close()
+        if os.path.isfile(wlanfname):
+            f2 = open(wlanfname, 'r')
+            for line in f2:
+                if line.startswith('|'):
+                    l = line.strip().strip('|').split()
+                    if '<>' in l:
+                        duration = float(l[2])
+                        byte += float(l[8])
+                        if duration!=0:
+                            throughtput += float(l[8])*8/(duration*10**6)
+                        delay += byte*float(l[10])
+            f2.close()
+        if byte!=0:
+            delay /= byte
+        else:
+            delay = 0.0
 
         t.append(throughtput)
         d.append(delay)
@@ -77,12 +83,12 @@ if __name__ == '__main__':
                     label='SPTCP')
 
     ax.set_xlabel('Hosts')
-    ax.set_ylabel('Goodput(bps)')
-    ax.set_title('Goodput performance')
+    ax.set_ylabel('Throughput (Mbps)')
+    ax.set_title('Throughput performance')
     ax.set_xticks(index + bar_width / 2)
     ax.set_xticklabels([str(i) for i in range(30)])
     ax.legend(loc='best', fontsize=12)
-    ax.set_ylim([0, 1500000])
+    ax.set_ylim([0, 0.8])
 
     rects1 = ax2.bar(index, FDM_delay, bar_width,
                      alpha=opacity, color='b', edgecolor="none",
@@ -94,22 +100,22 @@ if __name__ == '__main__':
                      alpha=opacity, color='g', edgecolor="none",
                      label='SPTCP')
     ax2.set_xlabel('Hosts')
-    ax2.set_ylabel('Packet delay(Sec)')
+    ax2.set_ylabel('Packet delay (s)')
     ax2.set_title('Delay performance')
     ax2.set_xticks(index + bar_width / 2)
     ax2.set_xticklabels([str(i) for i in range(30)])
     ax2.legend(loc='best', fontsize=12)
 
-    pkt_rate = [np.sum(FDM_goodput)/1000000/senderNumber, np.sum(multi_goodput)/1000000/senderNumber,
-                np.sum(single_goodput)/1000000/senderNumber]
+    pkt_rate = [np.sum(FDM_goodput)/senderNumber, np.sum(multi_goodput)/senderNumber,
+                np.sum(single_goodput)/senderNumber]
     ax3 = axes[1, 0]
     ax4 = axes[1, 1]
     index = np.arange(3)
     ax3.scatter(index, pkt_rate, marker='*', s=50)
     ax3.set_xlabel('Protocols')
-    ax3.set_ylabel('Average Goodput (Mbps)')
+    ax3.set_ylabel('Average Throughput (Mbps)')
     ax3.set_xticks(index)
-    ax3.set_ylim([0, 1])
+    ax3.set_ylim([0, 0.5])
     ax3.set_xticklabels(["FDM", "MPTCP", "SPTCP"])
 
     avg_delay = [np.sum(FDM_delay)/senderNumber, np.sum(multi_delay)/senderNumber, np.sum(single_delay)/senderNumber]
@@ -120,6 +126,6 @@ if __name__ == '__main__':
     ax4.set_xticks(index)
     ax4.set_xticklabels(["FDM", "MPTCP", "SPTCP"])
     # ax4.set_yscale("log")
-    ax4.set_ylim([0, 1])
+    ax4.set_ylim([0, 0.2])
     fig.tight_layout()
     plt.show()
